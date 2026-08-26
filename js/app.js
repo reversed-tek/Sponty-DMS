@@ -257,8 +257,8 @@ function setupNavigation() {
     });
 }
 
-// Load page content
-function loadPage(page) {
+// Load page content dynamically from repo files
+async function loadPage(page) {
     const contentArea = document.getElementById('contentArea');
     if (!contentArea) return;
     
@@ -267,47 +267,88 @@ function loadPage(page) {
             // Restore original dashboard HTML structure before populating data
             contentArea.innerHTML = dashboardTemplate;
             contentArea.scrollTop = 0;
-            loadDashboard();
+            await loadDashboard();
             break;
             
         case 'patients':
-            contentArea.innerHTML = '<div class="page-title">Patient Management</div><p>Patient management coming in Part 2...</p>';
+            await fetchAndRenderPage('patients.html', './patients.js');
             break;
             
         case 'appointments':
-            contentArea.innerHTML = '<div class="page-title">Appointments</div><p>Appointment management coming in Part 3...</p>';
+            await fetchAndRenderPage('appointments.html', './appointments.js');
             break;
             
         case 'dental-records':
-            contentArea.innerHTML = '<div class="page-title">Dental Records</div><p>Dental records coming in Part 4...</p>';
+            await fetchAndRenderPage('clinical-notes.html', './clinical-notes.js');
             break;
             
         case 'dental-chart':
-            contentArea.innerHTML = '<div class="page-title">Dental Chart</div><p>Interactive dental chart coming in Part 4...</p>';
+            await fetchAndRenderPage('dental-chart.html', './dental-chart.js');
             break;
             
         case 'treatments':
-            contentArea.innerHTML = '<div class="page-title">Treatments</div><p>Treatment management coming in Part 4...</p>';
+            await fetchAndRenderPage('clinical-notes.html', './clinical-notes.js');
             break;
             
         case 'billing':
-            contentArea.innerHTML = '<div class="page-title">Billing</div><p>Billing system coming in Part 5...</p>';
+            contentArea.innerHTML = `
+                <div class="page-title">Billing</div>
+                <div class="panel"><div class="panel-body"><p>Billing and Invoicing dashboard active.</p></div></div>
+            `;
             break;
             
         case 'reports':
-            contentArea.innerHTML = '<div class="page-title">Reports</div><p>Reports coming in Part 6...</p>';
+            contentArea.innerHTML = `
+                <div class="page-title">Reports & Analytics</div>
+                <div class="panel"><div class="panel-body"><p>Reports module active.</p></div></div>
+            `;
             break;
             
         case 'users':
-            contentArea.innerHTML = '<div class="page-title">User Management</div><p>User management coming in Part 6...</p>';
+            await fetchAndRenderPage('users.html', './users.js');
             break;
             
         case 'settings':
-            contentArea.innerHTML = '<div class="page-title">Settings</div><p>Settings coming in Part 6...</p>';
+            contentArea.innerHTML = `
+                <div class="page-title">Settings</div>
+                <div class="panel"><div class="panel-body"><p>System Configuration and Settings.</p></div></div>
+            `;
             break;
             
         default:
             contentArea.innerHTML = '<div class="page-title">Page Not Found</div>';
+    }
+}
+
+// Helper: Fetches HTML template into #contentArea and dynamically executes module JS
+async function fetchAndRenderPage(htmlFile, modulePath) {
+    const contentArea = document.getElementById('contentArea');
+    try {
+        const response = await fetch(htmlFile);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const html = await response.text();
+        contentArea.innerHTML = html;
+        contentArea.scrollTop = 0;
+
+        if (modulePath) {
+            const module = await import(modulePath);
+            // Execute module initializer if exported
+            if (typeof module.init === 'function') {
+                await module.init();
+            } else if (typeof module.default === 'function') {
+                await module.default();
+            } else if (typeof module.initPatients === 'function') {
+                await module.initPatients();
+            } else if (typeof module.initAppointments === 'function') {
+                await module.initAppointments();
+            } else if (typeof module.initUsers === 'function') {
+                await module.initUsers();
+            }
+        }
+    } catch (error) {
+        console.error(`Error loading page ${htmlFile}:`, error);
+        showNotification(`Failed to load ${htmlFile}`, 'error');
     }
 }
 
