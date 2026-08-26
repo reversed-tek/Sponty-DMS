@@ -3,20 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sponty DMS</title>
+    <title>Login - Dental Clinic Management System</title>
 
-    <!-- 1. Place MSAL CDN here (Before your module scripts) -->
+    <!-- Single MSAL Browser CDN Load -->
     <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 
-    <!-- 2. Your custom application scripts go below it -->
-    <script type="module" src="js/app.js"></script>
-</head>
-<body>
-    ...
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Dental Clinic Management System</title>
     <style>
         * {
             margin: 0;
@@ -69,46 +60,6 @@
             font-weight: bold;
             color: #003BA5;
             margin-bottom: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 16px;
-        }
-        
-        .form-label {
-            display: block;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 4px;
-            color: #000;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 5px 6px;
-            font-size: 13px;
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-            border: 1px solid #7F9DB9;
-            background: white;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: #0054E3;
-            background: #FFFEF7;
-        }
-        
-        .form-checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 16px;
-        }
-        
-        .login-actions {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
         }
         
         .btn {
@@ -164,10 +115,6 @@
             font-size: 12px;
             display: none;
         }
-        
-        .loading.show {
-            display: block;
-        }
     </style>
 </head>
 <body>
@@ -209,110 +156,84 @@
         </div>
     </div>
     
-    <!-- MSAL.js Library -->
-    <script src="https://alcdn.msauth.net/browser/2.32.2/js/msal-browser.min.js"></script>
-    
     <script type="module">
         import { initializeEntraAuth, signInWithEntra, isAuthenticated, handleAuthError } from './js/entra-auth.js';
         import { entraConfig } from './js/entra-config.js';
 
-        // Show error message
         function showError(message) {
             const errorEl = document.getElementById('errorMessage');
             errorEl.textContent = message;
             errorEl.classList.add('show');
         }
 
-        // Hide error message
         function hideError() {
             const errorEl = document.getElementById('errorMessage');
             errorEl.classList.remove('show');
         }
 
-        // Show success message
         function showSuccess(message) {
             const successEl = document.getElementById('successMessage');
             successEl.textContent = message;
             successEl.style.display = 'block';
         }
 
-        // Disable sign-in button
         function setButtonState(disabled) {
             const btn = document.getElementById('msSignInBtn');
+            if (!btn) return;
             btn.disabled = disabled;
-            if (disabled) {
-                btn.style.opacity = '0.6';
-                btn.style.cursor = 'not-allowed';
-            } else {
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-            }
+            btn.style.opacity = disabled ? '0.6' : '1';
+            btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
         }
 
-        // Initialize the application
         async function initializeApp() {
             try {
-                console.log('Initializing Microsoft Entra authentication...');
-                
-                // Initialize MSAL
                 await initializeEntraAuth(entraConfig);
                 
-                // Check if user is already authenticated
                 if (isAuthenticated()) {
-                    console.log('User already authenticated, redirecting...');
                     showSuccess('Already signed in. Redirecting...');
                     setTimeout(() => {
                         window.location.href = 'index.html';
                     }, 1000);
                     return;
                 }
-                
-                console.log('Ready for authentication');
-                
             } catch (error) {
                 console.error('Initialization error:', error);
                 showError('Failed to initialize authentication system. Please refresh the page.');
             }
         }
 
-        // Handle sign-in button click
         async function handleSignIn() {
             hideError();
             setButtonState(true);
             
             try {
                 showSuccess('Redirecting to Microsoft...');
-                
-                // Store intended return URL
                 sessionStorage.setItem('auth_return_url', 'index.html');
                 
-                // Initiate sign-in (will redirect to Microsoft)
                 await signInWithEntra({
                     scopes: ['openid', 'profile', 'email', 'User.Read']
                 });
-                
             } catch (error) {
                 console.error('Sign-in error:', error);
-                
                 const errorInfo = handleAuthError(error);
                 showError(errorInfo.message);
-                
                 setButtonState(false);
             }
         }
 
-        // Setup event listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize app
+        function start() {
             initializeApp();
-            
-            // Setup sign-in button
             const signInBtn = document.getElementById('msSignInBtn');
             if (signInBtn) {
                 signInBtn.addEventListener('click', handleSignIn);
             }
-        });
+        }
 
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', start);
+        } else {
+            start();
+        }
     </script>
 </body>
 </html>
