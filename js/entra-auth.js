@@ -181,23 +181,24 @@ async function getUserInfoFromGraph(accessToken) {
  * Find user in database by Entra ID
  * @param {string} entraUserId - Entra object ID
  */
-async function findUserByEntraId(entraUserId) {
-    try {
-        const { data, error } = await supabase
-            .rpc('find_user_by_entra_id', { p_entra_user_id: entraUserId });
+async function findUserByEntra(entraEmail) {
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', entraEmail) // Case-insensitive email lookup
+        .maybeSingle();
 
-        if (error) {
-            console.error('Database error finding user:', error);
-            return null;
-        }
-
-        return data && data.length > 0 ? data[0] : null;
-    } catch (error) {
-        console.error('Error finding user by Entra ID:', error);
-        return null;
+    if (error) {
+        console.error('Database error finding user:', error);
+        throw new Error('USER_NOT_FOUND');
     }
-}
 
+    if (!profile) {
+        throw new Error('USER_NOT_FOUND');
+    }
+
+    return profile;
+}
 /**
  * Create application session
  * @param {Object} user - Application user
