@@ -4,20 +4,26 @@ import { supabase, checkSupabaseConfig } from './supabase.js';
 import { showNotification, formatDate, formatTime } from './ui.js';
 import { isToday } from './utils.js';
 import { initializeEntraAuth, getCurrentSession } from './entra-auth.js';
-import { entraConfig } from './entra-config.js'; // Added config import
+import { entraConfig } from './entra-config.js';
 
-// Make logout available globally
-window.logout = logout;
+// Store original dashboard template to safely restore DOM structure on navigation
+let dashboardTemplate = '';
 
 // Initialize app
 async function init() {
     try {
-        // Step 1: Process Entra auth state/redirects BEFORE checking auth status
-        if (typeof initializeEntraAuth === 'function') {
-            await initializeEntraAuth(entraConfig); // Fixed: Passing the configuration
+        // Step 1: Cache initial Dashboard HTML structure
+        const contentArea = document.getElementById('contentArea');
+        if (contentArea) {
+            dashboardTemplate = contentArea.innerHTML;
         }
 
-        // Step 2: Now safe to verify authentication state
+        // Step 2: Process Entra auth state/redirects BEFORE checking auth status
+        if (typeof initializeEntraAuth === 'function') {
+            await initializeEntraAuth(entraConfig);
+        }
+
+        // Step 3: Verify authentication state
         const user = await checkAuth();
         if (!user) return;
         
@@ -26,6 +32,9 @@ async function init() {
             showNotification('Supabase is not configured. Please update configuration.', 'warning');
         }
         
+        // Setup header action listeners (Logout)
+        setupHeaderActions();
+
         // Load user info
         await loadUserInfo();
         
@@ -45,6 +54,17 @@ async function init() {
     }
 }
 
+// Setup Header Event Listeners
+function setupHeaderActions() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await logout();
+        });
+    }
+}
+
 // Load user information
 async function loadUserInfo() {
     try {
@@ -54,37 +74,40 @@ async function loadUserInfo() {
             const displayName = user.profile?.full_name || user.email || 'User';
             const role = user.profile?.role || 'staff';
             
-            document.getElementById('currentUser').textContent = displayName;
-            document.getElementById('statusUser').textContent = displayName;
-            document.getElementById('statusRole').textContent = role.charAt(0).toUpperCase() + role.slice(1);
+            updateUserDisplay(displayName, role);
+            return;
         }
     } catch (error) {
         console.error('Error loading user info:', error);
-        // Use fallback from Entra session
-        const session = await getCurrentSession();
-        if (session) {
-            const displayName = session.first_name 
-                ? `${session.first_name} ${session.last_name || ''}`.trim()
-                : session.email;
-            document.getElementById('currentUser').textContent = displayName;
-            document.getElementById('statusUser').textContent = displayName;
-            document.getElementById('statusRole').textContent = (session.role || 'User').charAt(0).toUpperCase() + (session.role || 'User').slice(1);
-        }
     }
+
+    // Use fallback from Entra session
+    const session = getCurrentSession();
+    if (session) {
+        const displayName = session.first_name 
+            ? `${session.first_name} ${session.last_name || ''}`.trim()
+            : session.email;
+        const role = session.role || 'User';
+        updateUserDisplay(displayName, role);
+    }
+}
+
+function updateUserDisplay(name, role) {
+    const currentUserEl = document.getElementById('currentUser');
+    const statusUserEl = document.getElementById('statusUser');
+    const statusRoleEl = document.getElementById('statusRole');
+
+    if (currentUserEl) currentUserEl.textContent = name;
+    if (statusUserEl) statusUserEl.textContent = name;
+    if (statusRoleEl) statusRoleEl.textContent = role.charAt(0).toUpperCase() + role.slice(1);
 }
 
 // Load dashboard data
 async function loadDashboard() {
     try {
-        // Load statistics
         await loadStatistics();
-        
-        // Load recent patients
         await loadRecentPatients();
-        
-        // Load today's schedule
         await loadTodaySchedule();
-        
     } catch (error) {
         console.error('Error loading dashboard:', error);
         showNotification('Error loading dashboard data', 'error');
@@ -94,17 +117,17 @@ async function loadDashboard() {
 // Load statistics
 async function loadStatistics() {
     try {
-        // Today's appointments
         const today = new Date().toISOString().split('T')[0];
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+        // Today's appointments
         const { count: todayCount, error: todayError } = await supabase
             .from('appointments')
             .select('*', { count: 'exact', head: true })
             .gte('appointment_date', today)
-            .lt('appointment_date', new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+            .lt('appointment_date', tomorrow);
         
-        if (!todayError) {
-            document.getElementById('statTodayAppointments').textContent = todayCount || 0;
-        }
+        setElementText('statTodayAppointments', todayError ? '0' : (todayCount || 0));
         
         // Total patients
         const { count: patientCount, error: patientError } = await supabase
@@ -112,9 +135,7 @@ async function loadStatistics() {
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
         
-        if (!patientError) {
-            document.getElementById('statTotalPatients').textContent = patientCount || 0;
-        }
+        setElementText('statTotalPatients', patientError ? '0' : (patientCount || 0));
         
         // Pending appointments
         const { count: pendingCount, error: pendingError } = await supabase
@@ -122,9 +143,7 @@ async function loadStatistics() {
             .select('*', { count: 'exact', head: true })
             .eq('status', 'scheduled');
         
-        if (!pendingError) {
-            document.getElementById('statPendingAppointments').textContent = pendingCount || 0;
-        }
+        setElementText('statPendingAppointments', pendingError ? '0' : (pendingCount || 0));
         
         // Unpaid invoices
         const { count: unpaidCount, error: unpaidError } = await supabase
@@ -132,30 +151,34 @@ async function loadStatistics() {
             .select('*', { count: 'exact', head: true })
             .neq('status', 'paid');
         
-        if (!unpaidError) {
-            document.getElementById('statUnpaidInvoices').textContent = unpaidCount || 0;
-        }
+        setElementText('statUnpaidInvoices', unpaidError ? '0' : (unpaidCount || 0));
         
     } catch (error) {
         console.error('Error loading statistics:', error);
-        // Set default values on error
-        document.getElementById('statTodayAppointments').textContent = '0';
-        document.getElementById('statTotalPatients').textContent = '0';
-        document.getElementById('statPendingAppointments').textContent = '0';
-        document.getElementById('statUnpaidInvoices').textContent = '0';
+        setElementText('statTodayAppointments', '0');
+        setElementText('statTotalPatients', '0');
+        setElementText('statPendingAppointments', '0');
+        setElementText('statUnpaidInvoices', '0');
     }
+}
+
+// Helper safely setting element text
+function setElementText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
 }
 
 // Load recent patients
 async function loadRecentPatients() {
+    const tbody = document.getElementById('recentPatientsTable');
+    if (!tbody) return;
+
     try {
         const { data, error } = await supabase
             .from('patients')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(5);
-        
-        const tbody = document.getElementById('recentPatientsTable');
         
         if (error) throw error;
         
@@ -176,13 +199,15 @@ async function loadRecentPatients() {
         
     } catch (error) {
         console.error('Error loading recent patients:', error);
-        document.getElementById('recentPatientsTable').innerHTML = 
-            '<tr><td colspan="5" class="table-empty">No recent patients</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No recent patients</td></tr>';
     }
 }
 
 // Load today's schedule
 async function loadTodaySchedule() {
+    const tbody = document.getElementById('todayScheduleTable');
+    if (!tbody) return;
+
     try {
         const today = new Date().toISOString().split('T')[0];
         
@@ -194,8 +219,6 @@ async function loadTodaySchedule() {
             `)
             .eq('appointment_date', today)
             .order('appointment_time', { ascending: true });
-        
-        const tbody = document.getElementById('todayScheduleTable');
         
         if (error) throw error;
         
@@ -215,8 +238,7 @@ async function loadTodaySchedule() {
         
     } catch (error) {
         console.error('Error loading today\'s schedule:', error);
-        document.getElementById('todayScheduleTable').innerHTML = 
-            '<tr><td colspan="4" class="table-empty">No appointments today</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No appointments today</td></tr>';
     }
 }
 
@@ -226,16 +248,10 @@ function setupNavigation() {
     
     sidebarItems.forEach(item => {
         item.addEventListener('click', function() {
-            // Remove active class from all items
             sidebarItems.forEach(i => i.classList.remove('active'));
-            
-            // Add active class to clicked item
             this.classList.add('active');
             
-            // Get page name
             const page = this.getAttribute('data-page');
-            
-            // Load page content
             loadPage(page);
         });
     });
@@ -244,10 +260,12 @@ function setupNavigation() {
 // Load page content
 function loadPage(page) {
     const contentArea = document.getElementById('contentArea');
+    if (!contentArea) return;
     
     switch(page) {
         case 'dashboard':
-            // Reload dashboard
+            // Restore original dashboard HTML structure before populating data
+            contentArea.innerHTML = dashboardTemplate;
             contentArea.scrollTop = 0;
             loadDashboard();
             break;
@@ -295,6 +313,9 @@ function loadPage(page) {
 
 // Update status bar time
 function updateStatusTime() {
+    const timeEl = document.getElementById('statusTime');
+    if (!timeEl) return;
+
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
@@ -307,7 +328,7 @@ function updateStatusTime() {
         year: 'numeric' 
     });
     
-    document.getElementById('statusTime').textContent = `${dateString} ${timeString}`;
+    timeEl.textContent = `${dateString} ${timeString}`;
 }
 
 // Initialize when DOM is ready
