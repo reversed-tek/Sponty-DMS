@@ -4,6 +4,7 @@ import { supabase, checkSupabaseConfig } from './supabase.js';
 import { showNotification, formatDate, formatTime } from './ui.js';
 import { isToday } from './utils.js';
 import { initializeEntraAuth, getCurrentSession } from './entra-auth.js';
+import { entraConfig } from './entra-config.js'; // Added config import
 
 // Make logout available globally
 window.logout = logout;
@@ -13,7 +14,7 @@ async function init() {
     try {
         // Step 1: Process Entra auth state/redirects BEFORE checking auth status
         if (typeof initializeEntraAuth === 'function') {
-            await initializeEntraAuth();
+            await initializeEntraAuth(entraConfig); // Fixed: Passing the configuration
         }
 
         // Step 2: Now safe to verify authentication state
