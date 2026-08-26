@@ -1,8 +1,8 @@
 // Supabase Configuration
 // Replace these with your actual Supabase project credentials
 
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://gdbvdvctadvgunirfclm.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYnZkdmN0YWR2Z3VuaXJmY2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MjY3OTAsImV4cCI6MjEwMzMwMjc5MH0.mWHX490eSUSWEbDZcPi0pl14WzcmV05DESSX86ucwYk';
 
 // Import Supabase client from CDN
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -12,7 +12,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Check if Supabase is properly configured
 export function checkSupabaseConfig() {
-    if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+    if (SUPABASE_URL === 'https://gdbvdvctadvgunirfclm.supabase.coL' || SUPABASE_ANON_KEY === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYnZkdmN0YWR2Z3VuaXJmY2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MjY3OTAsImV4cCI6MjEwMzMwMjc5MH0.mWHX490eSUSWEbDZcPi0pl14WzcmV05DESSX86ucwYk') {
         console.warn('Supabase is not configured. Please update supabase.js with your credentials.');
         return false;
     }
