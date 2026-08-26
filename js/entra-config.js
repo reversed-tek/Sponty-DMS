@@ -11,7 +11,7 @@
 
 export const entraConfig = {
     // Replace with your Application (client) ID from Entra
-    clientId: '03728557-8b13-4eba-8e36-67e87dae0fa7',
+    clientId: 'f22ddb91-c7e5-4aa3-b7ec-8daed605ec70',
     
     // Replace with your Directory (tenant) ID from Entra
     tenantId: '7cc6e8d5-0c87-4c60-af44-333eaf6d4d75',
