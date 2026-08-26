@@ -113,7 +113,7 @@ export async function signInWithEntra(options = {}) {
  * Process authentication response and create session
  * @param {Object} response - MSAL authentication response
  */
-async function processAuthenticationResponse(response) {
+export async function processAuthenticationResponse(response) {
     try {
         const account = response.account;
         const accessToken = response.accessToken;
