@@ -1,5 +1,3 @@
-
-
 import { supabase } from './supabase.js';
 
 // MSAL Configuration
@@ -121,7 +119,9 @@ export async function processAuthenticationResponse(response) {
         console.log('Processing authentication for:', account.username);
 
         const userInfo = await getUserInfoFromGraph(accessToken);
-        const appUser = await findUserByEntraId(account.localAccountId);
+        
+        // Pass account or username to locate profile record
+        const appUser = await findUserByEntraId(account);
         
         if (!appUser) {
             await logAuthEvent('login', false, account.localAccountId, 'User not found in system');
@@ -178,14 +178,23 @@ async function getUserInfoFromGraph(accessToken) {
 }
 
 /**
- * Find user in database by Entra ID
- * @param {string} entraUserId - Entra object ID
+ * Find user in database by Entra ID / Email
+ * @param {Object|string} entraInput - Entra user account or email address
  */
-async function findUserByEntra(entraEmail) {
+async function findUserByEntraId(entraInput) {
+    const email = typeof entraInput === 'string' 
+        ? entraInput 
+        : (entraInput?.username || entraInput?.email);
+
+    if (!email) {
+        console.error('No valid email provided to findUserByEntraId');
+        throw new Error('USER_NOT_FOUND');
+    }
+
     const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('email', entraEmail) // Case-insensitive email lookup
+        .ilike('email', email.trim()) // Case-insensitive email lookup
         .maybeSingle();
 
     if (error) {
@@ -193,24 +202,20 @@ async function findUserByEntra(entraEmail) {
         throw new Error('USER_NOT_FOUND');
     }
 
-    if (!profile) {
-        throw new Error('USER_NOT_FOUND');
-    }
-
     return profile;
 }
+
 /**
- * Create application session
- * @param {Object} user - Application user
+ * Create application session aligned with Supabase profiles table schema
+ * @param {Object} user - Application user from profiles table
  * @param {Object} entraAccount - Entra account
  * @param {string} accessToken - Access token
  */
 async function createApplicationSession(user, entraAccount, accessToken) {
     const session = {
-        user_id: user.user_id,
+        id: user.id,
         email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
+        full_name: user.full_name,
         clinic_id: user.clinic_id,
         role: user.role,
         auth_provider: 'entra',
@@ -467,9 +472,7 @@ export function getUserDisplayName() {
     const session = getCurrentSession();
     if (!session) return 'User';
     
-    return session.first_name 
-        ? `${session.first_name} ${session.last_name || ''}`.trim()
-        : session.email;
+    return session.full_name || session.email || 'User';
 }
 
 export default {
