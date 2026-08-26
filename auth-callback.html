@@ -110,7 +110,14 @@
     </div>
 
     <!-- MSAL.js Library -->
-    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+   <!-- Primary MSAL Browser CDN Load -->
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<!-- Secondary CDN Fallback if primary fails/blocked -->
+<script>
+    if (typeof msal === 'undefined' && !window.msal) {
+        document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+    }
+</script>
     
     <!-- Application Scripts -->
     <script type="module">
