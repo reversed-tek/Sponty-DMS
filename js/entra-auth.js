@@ -1,10 +1,8 @@
-/**
- * Microsoft Entra Authentication Module
- * Handles OAuth2/OIDC authentication flow using MSAL.js
- * Part 5: Entra Integration
- */
-
 import { supabase } from './supabase.js';
+import * as msalModule from 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/+esm';
+
+// Resolve MSAL library from ES module import or global window fallback
+const msal = msalModule?.PublicClientApplication ? msalModule : (window.msal || window.Msal);
 
 // MSAL Configuration
 let msalInstance = null;
@@ -15,6 +13,10 @@ let msalConfig = null;
  * @param {Object} config - Entra configuration object
  */
 export function initializeEntraAuth(config) {
+    if (!config) {
+        throw new Error('Entra configuration object is missing.');
+    }
+
     msalConfig = {
         auth: {
             clientId: config.clientId,
@@ -24,7 +26,7 @@ export function initializeEntraAuth(config) {
             navigateToLoginRequestUrl: false
         },
         cache: {
-            cacheLocation: 'sessionStorage', // More secure than localStorage
+            cacheLocation: 'sessionStorage',
             storeAuthStateInCookie: false
         },
         system: {
@@ -56,7 +58,6 @@ export function initializeEntraAuth(config) {
  */
 async function handleRedirectResponse(response) {
     if (response !== null) {
-        // Authentication successful
         console.log('Redirect response received:', response.account);
         return response;
     }
@@ -79,7 +80,6 @@ export async function signInWithEntra(options = {}) {
     };
 
     try {
-        // Try silent sign-in first (if user already authenticated)
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
             const silentRequest = {
@@ -95,7 +95,6 @@ export async function signInWithEntra(options = {}) {
             }
         }
 
-        // Redirect to Microsoft login
         await msalInstance.loginRedirect(loginRequest);
         
     } catch (error) {
@@ -116,10 +115,7 @@ async function processAuthenticationResponse(response) {
         
         console.log('Processing authentication for:', account.username);
 
-        // Get additional user info from Microsoft Graph
         const userInfo = await getUserInfoFromGraph(accessToken);
-        
-        // Find user in database by Entra ID
         const appUser = await findUserByEntraId(account.localAccountId);
         
         if (!appUser) {
@@ -137,10 +133,7 @@ async function processAuthenticationResponse(response) {
             throw new Error('NO_CLINIC_ASSIGNED');
         }
 
-        // Create application session
         const session = await createApplicationSession(appUser, account, accessToken);
-        
-        // Log successful authentication
         await logAuthEvent('login', true, account.localAccountId, null);
         
         return {
@@ -224,7 +217,6 @@ async function createApplicationSession(user, entraAccount, accessToken) {
         created_at: new Date().toISOString()
     };
 
-    // Store session in sessionStorage
     sessionStorage.setItem('dental_app_session', JSON.stringify(session));
     sessionStorage.setItem('dental_app_clinic_id', user.clinic_id);
     
@@ -291,8 +283,7 @@ export async function acquireTokenSilently(scopes = ['User.Read']) {
     } catch (error) {
         console.error('Token acquisition error:', error);
         
-        // If silent acquisition fails, try interactive
-        if (error instanceof msal.InteractionRequiredAuthError) {
+        if (msal?.InteractionRequiredAuthError && error instanceof msal.InteractionRequiredAuthError) {
             await msalInstance.acquireTokenRedirect(request);
         }
         
@@ -308,17 +299,14 @@ export async function signOut() {
         const session = getCurrentSession();
         const entraUserId = session?.entra_account?.id;
 
-        // Log sign-out event
         if (entraUserId) {
             await logAuthEvent('logout', true, entraUserId, null);
         }
 
-        // Clear application session
         sessionStorage.removeItem('dental_app_session');
         sessionStorage.removeItem('dental_app_clinic_id');
         localStorage.clear();
 
-        // Sign out from Entra
         if (msalInstance) {
             const account = getCurrentEntraAccount();
             if (account) {
@@ -332,7 +320,6 @@ export async function signOut() {
 
     } catch (error) {
         console.error('Sign-out error:', error);
-        // Even if Entra sign-out fails, clear local session
         sessionStorage.clear();
         localStorage.clear();
         window.location.href = 'login.html';
@@ -342,29 +329,24 @@ export async function signOut() {
 /**
  * Refresh user session
  */
-export async function refreshSession() {
-    try {
-        const accessToken = await acquireTokenSilently();
-        const session = getCurrentSession();
-        
-        if (session) {
-            session.access_token = accessToken;
-            sessionStorage.setItem('dental_app_session', JSON.stringify(session));
-        }
-        
-        return session;
-    } catch (error) {
-        console.error('Session refresh error:', error);
-        throw error;
-    }
+export function refreshSession() {
+    return acquireTokenSilently()
+        .then(accessToken => {
+            const session = getCurrentSession();
+            if (session) {
+                session.access_token = accessToken;
+                sessionStorage.setItem('dental_app_session', JSON.stringify(session));
+            }
+            return session;
+        })
+        .catch(error => {
+            console.error('Session refresh error:', error);
+            throw error;
+        });
 }
 
 /**
  * Log authentication event to audit log
- * @param {string} eventType - Event type
- * @param {boolean} success - Success flag
- * @param {string} entraUserId - Entra user ID
- * @param {string} errorMessage - Error message if failed
  */
 async function logAuthEvent(eventType, success, entraUserId, errorMessage) {
     try {
@@ -393,7 +375,7 @@ async function logAuthEvent(eventType, success, entraUserId, errorMessage) {
 }
 
 /**
- * Get client IP address (best effort)
+ * Get client IP address
  */
 async function getClientIP() {
     try {
@@ -406,7 +388,7 @@ async function getClientIP() {
 }
 
 /**
- * Generate secure state parameter for CSRF protection
+ * Generate secure state parameter
  */
 function generateStateParameter() {
     const array = new Uint8Array(32);
@@ -416,7 +398,6 @@ function generateStateParameter() {
 
 /**
  * Handle authentication errors
- * @param {Error} error - Error object
  */
 export function handleAuthError(error) {
     console.error('Authentication error:', error);
@@ -445,7 +426,7 @@ export function handleAuthError(error) {
         };
     }
 
-    if (error instanceof msal.BrowserAuthError) {
+    if (msal?.BrowserAuthError && error instanceof msal.BrowserAuthError) {
         return {
             title: 'Authentication Error',
             message: 'Failed to authenticate with Microsoft. Please try again.',
@@ -483,7 +464,6 @@ export function getUserDisplayName() {
         : session.email;
 }
 
-// Export for use in other modules
 export default {
     initializeEntraAuth,
     signInWithEntra,
