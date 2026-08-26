@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Authenticating - Dental Practice Manager</title>
+    <link rel="shortcut icon" href="#">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         .spinner {
@@ -109,19 +110,18 @@
         </div>
     </div>
 
-    <!-- MSAL.js Library -->
-   <!-- Primary MSAL Browser CDN Load -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
-<!-- Secondary CDN Fallback if primary fails/blocked -->
-<script>
-    if (typeof msal === 'undefined' && !window.msal) {
-        document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
-    }
-</script>
+    <!-- Primary MSAL Browser CDN Load -->
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <!-- Secondary CDN Fallback if primary fails/blocked -->
+    <script>
+        if (typeof msal === 'undefined' && !window.msal) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+        }
+    </script>
     
     <!-- Application Scripts -->
     <script type="module">
-        import { initializeEntraAuth, handleAuthError } from './js/entra-auth.js';
+        import { initializeEntraAuth, processAuthenticationResponse, handleAuthError } from './js/entra-auth.js';
         import { entraConfig } from './js/entra-config.js';
 
         // Global functions for buttons
@@ -187,6 +187,14 @@
                 const response = await initializeEntraAuth(entraConfig);
                 
                 if (response && response.account) {
+                    updateStatus('Verifying your account...');
+
+                    // Create the application session (Graph lookup + Supabase user check
+                    // + writes dental_app_session to sessionStorage). This step was
+                    // previously missing, which caused isAuthenticated() to always
+                    // return false and produced a login redirect loop.
+                    await processAuthenticationResponse(response);
+
                     updateStatus('Authentication successful!');
                     showSuccess();
                     
