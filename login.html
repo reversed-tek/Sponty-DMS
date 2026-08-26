@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Dental Clinic Management System</title>
 
+    <!-- Prevent missing favicon 404 console error -->
+    <link rel="shortcut icon" href="#">
+
     <!-- Single MSAL Browser CDN Load -->
     <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 
@@ -162,19 +165,25 @@
 
         function showError(message) {
             const errorEl = document.getElementById('errorMessage');
-            errorEl.textContent = message;
-            errorEl.classList.add('show');
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.add('show');
+            }
         }
 
         function hideError() {
             const errorEl = document.getElementById('errorMessage');
-            errorEl.classList.remove('show');
+            if (errorEl) {
+                errorEl.classList.remove('show');
+            }
         }
 
         function showSuccess(message) {
             const successEl = document.getElementById('successMessage');
-            successEl.textContent = message;
-            successEl.style.display = 'block';
+            if (successEl) {
+                successEl.textContent = message;
+                successEl.style.display = 'block';
+            }
         }
 
         function setButtonState(disabled) {
@@ -187,6 +196,11 @@
 
         async function initializeApp() {
             try {
+                // Verify MSAL SDK availability prior to initialization
+                if (typeof msal === 'undefined' && !window.msal) {
+                    throw new Error('MSAL SDK failed to load from CDN. Check your network or ad-blocker settings.');
+                }
+
                 await initializeEntraAuth(entraConfig);
                 
                 if (isAuthenticated()) {
@@ -198,7 +212,7 @@
                 }
             } catch (error) {
                 console.error('Initialization error:', error);
-                showError('Failed to initialize authentication system. Please refresh the page.');
+                showError(error.message || 'Failed to initialize authentication system. Please refresh the page.');
             }
         }
 
