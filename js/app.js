@@ -327,13 +327,23 @@ async function fetchAndRenderPage(htmlFile, modulePath) {
         const response = await fetch(htmlFile);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
-        const html = await response.text();
-        contentArea.innerHTML = html;
+        const rawHtml = await response.text();
+        
+        // Parse raw HTML string to strip <html>, <head>, and <body> wrappers
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(rawHtml, 'text/html');
+        
+        // Extract inner content from target container or body
+        const container = doc.querySelector('.content-area') || 
+                          doc.querySelector('.main-content') || 
+                          doc.body;
+                          
+        contentArea.innerHTML = container ? container.innerHTML : rawHtml;
         contentArea.scrollTop = 0;
 
+        // Load and execute module if available
         if (modulePath) {
             const module = await import(modulePath);
-            // Execute module initializer if exported
             if (typeof module.init === 'function') {
                 await module.init();
             } else if (typeof module.default === 'function') {
