@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical History - Dental Practice Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="menu-icon" id="menuIcon">☰</div>
+            <div class="logo">Dental Practice Manager</div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="user-name" id="userName">Loading...</div>
+                <div class="user-role" id="userRole"></div>
+            </div>
+            <button class="btn-logout" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">Navigation</div>
+                <div class="sidebar-items">
+                    <div class="sidebar-item" data-page="dashboard">Dashboard</div>
+                    <div class="sidebar-item" data-page="patients">Patients</div>
+                    <div class="sidebar-item" data-page="appointments">Appointments</div>
+                    <div class="sidebar-item active" data-page="medical-history">Medical History</div>
+                    <div class="sidebar-item" data-page="dental-chart">Dental Chart</div>
+                    <div class="sidebar-item" data-page="treatments">Treatments</div>
+                    <div class="sidebar-item" data-page="billing">Billing</div>
+                    <div class="sidebar-item" data-page="reports">Reports</div>
+                    <div class="sidebar-item" data-page="users">Users</div>
+                    <div class="sidebar-item" data-page="settings">Settings</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb">
+                <a href="index.html">Dashboard</a> &gt;
+                <a href="patients.html">Patients</a> &gt;
+                <a href="#" id="patientBreadcrumb">Patient</a> &gt;
+                <span>Medical History</span>
+            </div>
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="page-title-section">
+                    <h1 class="page-title">Medical History</h1>
+                    <div class="page-subtitle" id="patientInfo">Loading patient...</div>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-secondary" id="backToPatientBtn">
+                        ← Back to Patient
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="tabs">
+                <div class="tab active" data-tab="conditions">Medical Conditions</div>
+                <div class="tab" data-tab="medications">Medications</div>
+                <div class="tab" data-tab="allergies">Allergies</div>
+            </div>
+
+            <!-- Medical Conditions Tab -->
+            <div class="tab-content active" id="conditionsTab">
+                <div class="section-header">
+                    <h2>Medical Conditions</h2>
+                    <button class="btn btn-primary btn-sm" id="addConditionBtn">+ Add Condition</button>
+                </div>
+                
+                <div id="conditionsContainer">
+                    <div class="loading-message">Loading conditions...</div>
+                </div>
+                
+                <div id="conditionsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">🏥</div>
+                    <div class="empty-state-message">No medical conditions recorded</div>
+                    <button class="btn btn-primary" id="addFirstConditionBtn">Add First Condition</button>
+                </div>
+            </div>
+
+            <!-- Medications Tab -->
+            <div class="tab-content" id="medicationsTab">
+                <div class="section-header">
+                    <h2>Current Medications</h2>
+                    <button class="btn btn-primary btn-sm" id="addMedicationBtn">+ Add Medication</button>
+                </div>
+                
+                <div id="medicationsContainer">
+                    <div class="loading-message">Loading medications...</div>
+                </div>
+                
+                <div id="medicationsEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">💊</div>
+                    <div class="empty-state-message">No medications recorded</div>
+                    <button class="btn btn-primary" id="addFirstMedicationBtn">Add First Medication</button>
+                </div>
+            </div>
+
+            <!-- Allergies Tab -->
+            <div class="tab-content" id="allergiesTab">
+                <div class="section-header">
+                    <h2>Allergies</h2>
+                    <button class="btn btn-primary btn-sm" id="addAllergyBtn">+ Add Allergy</button>
+                </div>
+                
+                <div id="allergiesContainer">
+                    <div class="loading-message">Loading allergies...</div>
+                </div>
+                
+                <div id="allergiesEmpty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">⚠️</div>
+                    <div class="empty-state-message">No allergies recorded</div>
+                    <button class="btn btn-primary" id="addFirstAllergyBtn">Add First Allergy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medical Condition Modal -->
+    <div id="conditionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="conditionModalTitle">Add Medical Condition</h2>
+                <span class="close" id="closeConditionModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="conditionForm">
+                    <input type="hidden" id="conditionId">
+                    
+                    <div class="form-group">
+                        <label for="conditionName">Condition Name *</label>
+                        <input type="text" id="conditionName" required placeholder="e.g., Hypertension, Diabetes">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="conditionType">Type *</label>
+                            <select id="conditionType" required>
+                                <option value="chronic">Chronic</option>
+                                <option value="acute">Acute</option>
+                                <option value="past">Past Condition</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="conditionSeverity">Severity</label>
+                            <select id="conditionSeverity">
+                                <option value="">Not specified</option>
+                                <option value="mild">Mild</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="severe">Severe</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="diagnosedDate">Diagnosed Date</label>
+                            <input type="date" id="diagnosedDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="resolvedDate">Resolved Date (if applicable)</label>
+                            <input type="date" id="resolvedDate">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conditionNotes">Notes</label>
+                        <textarea id="conditionNotes" rows="3" placeholder="Additional information about the condition"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelConditionBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveConditionBtn">Save Condition</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medication Modal -->
+    <div id="medicationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="medicationModalTitle">Add Medication</h2>
+                <span class="close" id="closeMedicationModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="medicationForm">
+                    <input type="hidden" id="medicationId">
+                    
+                    <div class="form-group">
+                        <label for="medicationName">Medication Name *</label>
+                        <input type="text" id="medicationName" required placeholder="e.g., Aspirin, Lisinopril">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="medicationDosage">Dosage *</label>
+                            <input type="text" id="medicationDosage" required placeholder="e.g., 10mg, 500mg">
+                        </div>
+                        <div class="form-group">
+                            <label for="medicationFrequency">Frequency *</label>
+                            <input type="text" id="medicationFrequency" required placeholder="e.g., Twice daily, Every 8 hours">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="medicationRoute">Route</label>
+                            <select id="medicationRoute">
+                                <option value="oral">Oral</option>
+                                <option value="topical">Topical</option>
+                                <option value="injection">Injection</option>
+                                <option value="inhalation">Inhalation</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="medicationPurpose">Purpose</label>
+                            <input type="text" id="medicationPurpose" placeholder="e.g., Blood pressure control">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="medicationStartDate">Start Date</label>
+                            <input type="date" id="medicationStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="medicationEndDate">End Date (if applicable)</label>
+                            <input type="date" id="medicationEndDate">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="prescribedBy">Prescribed By</label>
+                        <input type="text" id="prescribedBy" placeholder="Doctor's name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="medicationNotes">Notes</label>
+                        <textarea id="medicationNotes" rows="2" placeholder="Additional information"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="medicationActive">
+                            Currently Active
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelMedicationBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveMedicationBtn">Save Medication</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Allergy Modal -->
+    <div id="allergyModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="allergyModalTitle">Add Allergy</h2>
+                <span class="close" id="closeAllergyModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="allergyForm">
+                    <input type="hidden" id="allergyId">
+                    
+                    <div class="form-group">
+                        <label for="allergen">Allergen *</label>
+                        <input type="text" id="allergen" required placeholder="e.g., Penicillin, Latex, Pollen">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="allergyType">Type *</label>
+                            <select id="allergyType" required>
+                                <option value="medication">Medication</option>
+                                <option value="food">Food</option>
+                                <option value="environmental">Environmental</option>
+                                <option value="material">Material (e.g., Latex)</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="allergySeverity">Severity *</label>
+                            <select id="allergySeverity" required>
+                                <option value="mild">Mild</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="severe">Severe</option>
+                                <option value="life_threatening">Life-threatening</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="allergyReaction">Reaction *</label>
+                        <textarea id="allergyReaction" rows="2" required placeholder="e.g., Rash, Swelling, Difficulty breathing"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="allergyOnsetDate">Onset Date</label>
+                        <input type="date" id="allergyOnsetDate">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="allergyNotes">Notes</label>
+                        <textarea id="allergyNotes" rows="2" placeholder="Additional information"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="allergyVerified">
+                            Verified by Healthcare Provider
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelAllergyBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveAllergyBtn">Save Allergy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/medical-history.js"></script>
+</body>
+</html>

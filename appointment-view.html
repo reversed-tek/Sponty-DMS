@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Details - Dental Practice Management</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>📅 Appointment Details</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-name"></span>
+                <button onclick="handleLogout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-bar">
+            <a href="index.html">Dashboard</a>
+            <a href="patients.html">Patients</a>
+            <a href="appointments.html" class="active">Appointments</a>
+            <a href="#">Treatments</a>
+            <a href="#">Billing</a>
+            <a href="#">Reports</a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button onclick="window.location.href='appointments.html'" class="btn-secondary">
+                        ← Back to Appointments
+                    </button>
+                    <button onclick="appointmentView.editAppointment()" class="btn-primary" id="edit-btn">
+                        ✏️ Edit
+                    </button>
+                </div>
+                <div class="toolbar-right">
+                    <button onclick="appointmentView.printAppointment()" class="btn-secondary">
+                        🖨️ Print
+                    </button>
+                </div>
+            </div>
+
+            <!-- Appointment Details -->
+            <div class="detail-container" id="appointment-details">
+                <!-- Basic Information -->
+                <div class="detail-section">
+                    <h2>Appointment Information</h2>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value" id="display-status"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Date:</span>
+                            <span class="detail-value" id="display-date"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Time:</span>
+                            <span class="detail-value" id="display-time"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Duration:</span>
+                            <span class="detail-value" id="display-duration"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Type:</span>
+                            <span class="detail-value" id="display-type"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Dentist:</span>
+                            <span class="detail-value" id="display-dentist"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Patient Information -->
+                <div class="detail-section">
+                    <h2>Patient Information</h2>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Name:</span>
+                            <span class="detail-value" id="display-patient-name"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Patient Number:</span>
+                            <span class="detail-value" id="display-patient-number"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Phone:</span>
+                            <span class="detail-value" id="display-phone"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Email:</span>
+                            <span class="detail-value" id="display-email"></span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <button onclick="appointmentView.viewPatient()" class="btn-secondary">
+                                View Patient Profile →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reason and Notes -->
+                <div class="detail-section">
+                    <h2>Additional Information</h2>
+                    <div class="detail-grid">
+                        <div class="detail-item full-width">
+                            <span class="detail-label">Reason for Visit:</span>
+                            <span class="detail-value" id="display-reason"></span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <span class="detail-label">Notes:</span>
+                            <span class="detail-value" id="display-notes"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="detail-section">
+                    <h2>Quick Actions</h2>
+                    <div class="action-buttons">
+                        <button onclick="appointmentView.confirmAppointment()" class="btn-action" id="confirm-btn">
+                            ✓ Confirm
+                        </button>
+                        <button onclick="appointmentView.startAppointment()" class="btn-action" id="start-btn">
+                            ▶ Start
+                        </button>
+                        <button onclick="appointmentView.completeAppointment()" class="btn-action" id="complete-btn">
+                            ✓ Complete
+                        </button>
+                        <button onclick="appointmentView.cancelAppointment()" class="btn-action btn-danger" id="cancel-btn">
+                            ✕ Cancel
+                        </button>
+                        <button onclick="appointmentView.markNoShow()" class="btn-action btn-warning" id="noshow-btn">
+                            ⚠ No Show
+                        </button>
+                        <button onclick="appointmentView.rescheduleAppointment()" class="btn-action" id="reschedule-btn">
+                            🔄 Reschedule
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metadata -->
+                <div class="detail-section">
+                    <h2>Record Information</h2>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Created:</span>
+                            <span class="detail-value" id="display-created"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Updated:</span>
+                            <span class="detail-value" id="display-updated"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading" style="display: none;">
+                Loading appointment details...
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/appointment-view.js"></script>
+    <script>
+        let appointmentView;
+
+        async function initPage() {
+            const user = await checkAuth();
+            if (!user) return;
+
+            document.getElementById('user-name').textContent = user.email;
+
+            // Get appointment ID from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const appointmentId = urlParams.get('id');
+
+            if (!appointmentId) {
+                showError('No appointment ID provided');
+                setTimeout(() => {
+                    window.location.href = 'appointments.html';
+                }, 2000);
+                return;
+            }
+
+            appointmentView = new AppointmentView(appointmentId);
+            await appointmentView.init();
+        }
+
+        async function handleLogout() {
+            await logout();
+            window.location.href = 'login.html';
+        }
+
+        // Initialize page when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPage);
+        } else {
+            initPage();
+        }
+    </script>
+</body>
+</html>

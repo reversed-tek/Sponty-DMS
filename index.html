@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental Clinic Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/tables.css">
+    <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Application Header -->
+        <div class="app-header">
+            <div class="app-title">
+                <div class="app-title-icon"></div>
+                <span>Dental Clinic Management System</span>
+            </div>
+            <div class="app-header-actions">
+                <span id="currentUser" style="font-size: 12px; margin-right: 8px;"></span>
+                <button class="header-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+        
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-item">File</div>
+            <div class="menu-item">Patients</div>
+            <div class="menu-item">Appointments</div>
+            <div class="menu-item">Reports</div>
+            <div class="menu-item">Help</div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-header">Navigation</div>
+                    <div class="sidebar-items">
+                        <div class="sidebar-item active" data-page="dashboard">Dashboard</div>
+                        <div class="sidebar-item" data-page="patients">Patients</div>
+                        <div class="sidebar-item" data-page="appointments">Appointments</div>
+                        <div class="sidebar-item" data-page="dental-records">Dental Records</div>
+                        <div class="sidebar-item" data-page="dental-chart">Dental Chart</div>
+                        <div class="sidebar-item" data-page="treatments">Treatments</div>
+                        <div class="sidebar-item" data-page="billing">Billing</div>
+                        <div class="sidebar-item" data-page="reports">Reports</div>
+                        <div class="sidebar-item" data-page="users">Users</div>
+                        <div class="sidebar-item" data-page="settings">Settings</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content Area -->
+            <div class="content-area" id="contentArea">
+                <!-- Dashboard content will be loaded here -->
+                <div class="page-title">Dashboard</div>
+                
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Today's Appointments</div>
+                        <div class="stat-value" id="statTodayAppointments">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Total Patients</div>
+                        <div class="stat-value" id="statTotalPatients">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Pending Appointments</div>
+                        <div class="stat-value" id="statPendingAppointments">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Unpaid Invoices</div>
+                        <div class="stat-value" id="statUnpaidInvoices">-</div>
+                    </div>
+                </div>
+                
+                <!-- Recent Patients -->
+                <div class="panel">
+                    <div class="panel-header">Recent Patients</div>
+                    <div class="panel-body">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Patient ID</th>
+                                        <th>Name</th>
+                                        <th>Contact</th>
+                                        <th>Date Registered</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentPatientsTable">
+                                    <tr>
+                                        <td colspan="5" class="table-empty">Loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Today's Schedule -->
+                <div class="panel">
+                    <div class="panel-header">Today's Schedule</div>
+                    <div class="panel-body">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Patient</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="todayScheduleTable">
+                                    <tr>
+                                        <td colspan="4" class="table-empty">Loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div style="display: flex;">
+                <div class="status-item">Ready</div>
+                <div class="status-item">User: <span id="statusUser">-</span></div>
+                <div class="status-item">Role: <span id="statusRole">-</span></div>
+            </div>
+            <div class="status-item" id="statusTime"></div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Notes - Dental Practice Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="menu-icon" id="menuIcon">☰</div>
+            <div class="logo">Dental Practice Manager</div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="user-name" id="userName">Loading...</div>
+                <div class="user-role" id="userRole"></div>
+            </div>
+            <button class="btn-logout" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">Navigation</div>
+                <div class="sidebar-items">
+                    <div class="sidebar-item" data-page="dashboard">Dashboard</div>
+                    <div class="sidebar-item" data-page="patients">Patients</div>
+                    <div class="sidebar-item" data-page="appointments">Appointments</div>
+                    <div class="sidebar-item active" data-page="dental-records">Dental Records</div>
+                    <div class="sidebar-item" data-page="dental-chart">Dental Chart</div>
+                    <div class="sidebar-item" data-page="treatments">Treatments</div>
+                    <div class="sidebar-item" data-page="billing">Billing</div>
+                    <div class="sidebar-item" data-page="reports">Reports</div>
+                    <div class="sidebar-item" data-page="users">Users</div>
+                    <div class="sidebar-item" data-page="settings">Settings</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb">
+                <a href="index.html">Dashboard</a> &gt;
+                <a href="patients.html">Patients</a> &gt;
+                <a href="#" id="patientBreadcrumb">Patient</a> &gt;
+                <span>Clinical Notes</span>
+            </div>
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="page-title-section">
+                    <h1 class="page-title">Clinical Notes</h1>
+                    <div class="page-subtitle" id="patientInfo">Loading patient...</div>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-secondary" id="backToPatientBtn">
+                        ← Back to Patient
+                    </button>
+                    <button class="btn btn-primary" id="addNoteBtn">
+                        + Add Clinical Note
+                    </button>
+                </div>
+            </div>
+
+            <!-- Medical Alerts (if any) -->
+            <div id="medicalAlerts" style="display: none;"></div>
+
+            <!-- Filters and Search -->
+            <div class="filters-section">
+                <div class="filters-row">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search notes...">
+                    </div>
+                    <div class="filter-group">
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="general">General</option>
+                            <option value="follow_up">Follow-up</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="consultation">Consultation</option>
+                            <option value="treatment">Treatment</option>
+                        </select>
+                        <select id="dentistFilter" class="filter-select">
+                            <option value="">All Dentists</option>
+                        </select>
+                        <input type="date" id="dateFromFilter" class="filter-input" placeholder="From Date">
+                        <input type="date" id="dateToFilter" class="filter-input" placeholder="To Date">
+                        <button class="btn btn-secondary btn-sm" id="clearFiltersBtn">Clear Filters</button>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary btn-sm" id="exportCsvBtn">Export CSV</button>
+                        <button class="btn btn-secondary btn-sm" id="printBtn">Print</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes List -->
+            <div id="notesContainer">
+                <div class="loading-message">Loading clinical notes...</div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-message">No clinical notes found</div>
+                <button class="btn btn-primary" id="addFirstNoteBtn">Add First Clinical Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Note Modal -->
+    <div id="noteModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Clinical Note</h2>
+                <span class="close" id="closeModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="noteForm">
+                    <input type="hidden" id="noteId">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="noteDate">Date *</label>
+                            <input type="date" id="noteDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="noteCategory">Category *</label>
+                            <select id="noteCategory" required>
+                                <option value="general">General</option>
+                                <option value="follow_up">Follow-up</option>
+                                <option value="emergency">Emergency</option>
+                                <option value="consultation">Consultation</option>
+                                <option value="treatment">Treatment</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="appointmentId">Related Appointment (Optional)</label>
+                            <select id="appointmentId">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="chiefComplaint">Chief Complaint</label>
+                        <textarea id="chiefComplaint" rows="2" placeholder="Patient's main concern or reason for visit"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="clinicalFindings">Clinical Findings *</label>
+                        <textarea id="clinicalFindings" rows="4" required placeholder="Examination findings, observations, test results"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="diagnosisSummary">Diagnosis Summary</label>
+                        <textarea id="diagnosisSummary" rows="3" placeholder="Diagnosis or assessment"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="treatmentPlan">Treatment Plan</label>
+                        <textarea id="treatmentPlan" rows="3" placeholder="Recommended treatment plan or next steps"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="additionalNotes">Additional Notes</label>
+                        <textarea id="additionalNotes" rows="2" placeholder="Any other relevant information"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="isPrivate">
+                            Mark as Private (visible only to dentists)
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Save Note</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/clinical-notes.js"></script>
+</body>
+</html>

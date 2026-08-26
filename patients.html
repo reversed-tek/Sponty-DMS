@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patients - Dental Practice Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/tables.css">
+    <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-title">🦷 Dental Practice Management</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-info" class="user-info">Loading...</span>
+                <button id="logout-btn" class="btn btn-small">Logout</button>
+            </div>
+        </header>
+
+        <!-- Menu Bar -->
+        <nav class="menu-bar">
+            <a href="index.html" class="menu-item">Dashboard</a>
+            <a href="patients.html" class="menu-item active">Patients</a>
+            <a href="#" class="menu-item">Appointments</a>
+            <a href="#" class="menu-item">Treatments</a>
+            <a href="#" class="menu-item">Billing</a>
+            <a href="#" class="menu-item">Reports</a>
+        </nav>
+
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Dashboard</h3>
+                    <a href="index.html">Overview</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Patients</h3>
+                    <a href="patients.html" class="active">All Patients</a>
+                    <a href="patient-add.html">Add New Patient</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Schedule</h3>
+                    <a href="#">Appointments</a>
+                    <a href="#">Calendar</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Clinical</h3>
+                    <a href="#">Treatments</a>
+                    <a href="#">Procedures</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Financial</h3>
+                    <a href="#">Invoices</a>
+                    <a href="#">Payments</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Reports</h3>
+                    <a href="#">Statistics</a>
+                    <a href="#">Export Data</a>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="content">
+                <div class="content-header">
+                    <h2>Patient Management</h2>
+                    <div class="content-actions">
+                        <button id="export-btn" class="btn btn-secondary">Export CSV</button>
+                        <button id="print-btn" class="btn btn-secondary">Print List</button>
+                        <a href="patient-add.html" class="btn btn-primary">Add New Patient</a>
+                    </div>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Search & Filter</h3>
+                        <button id="toggle-filters" class="btn btn-small">Show Filters</button>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Quick Search -->
+                        <form class="search-form" id="quick-search-form">
+                            <input 
+                                type="text" 
+                                id="search-input" 
+                                placeholder="Search by name, patient #, phone, or email..." 
+                                class="search-input"
+                            >
+                            <button type="submit" class="btn btn-primary">Search</button>
+                            <button type="button" id="clear-search" class="btn btn-secondary">Clear</button>
+                        </form>
+
+                        <!-- Advanced Filters (Hidden by default) -->
+                        <div id="advanced-filters" class="advanced-filters" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="filter-status">Status</label>
+                                    <select id="filter-status">
+                                        <option value="">All Patients</option>
+                                        <option value="true">Active Only</option>
+                                        <option value="false">Inactive Only</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="filter-gender">Gender</label>
+                                    <select id="filter-gender">
+                                        <option value="">All</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="filter-age-min">Min Age</label>
+                                    <input type="number" id="filter-age-min" placeholder="0" min="0" max="150">
+                                </div>
+                                <div class="form-group">
+                                    <label for="filter-age-max">Max Age</label>
+                                    <input type="number" id="filter-age-max" placeholder="150" min="0" max="150">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="apply-filters" class="btn btn-primary">Apply Filters</button>
+                                <button type="button" id="reset-filters" class="btn btn-secondary">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Patients Table -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Patient List <span id="patient-count" class="badge">0</span></h3>
+                        <div class="panel-actions">
+                            <label>
+                                Show 
+                                <select id="page-size">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                                entries
+                            </label>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="loading-indicator" style="display: none; text-align: center; padding: 20px;">
+                            Loading patients...
+                        </div>
+                        
+                        <div id="error-message" class="error-message" style="display: none;"></div>
+                        
+                        <div class="table-container">
+                            <table id="patients-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="patient_number">Patient #</th>
+                                        <th data-sort="last_name">Name</th>
+                                        <th data-sort="date_of_birth">Age</th>
+                                        <th data-sort="gender">Gender</th>
+                                        <th>Phone</th>
+                                        <th>Email</th>
+                                        <th>Last Visit</th>
+                                        <th data-sort="is_active">Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="patients-tbody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="empty-state" class="empty-state" style="display: none;">
+                            <p>No patients found.</p>
+                            <a href="patient-add.html" class="btn btn-primary">Add Your First Patient</a>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div id="pagination" class="pagination" style="display: none;">
+                            <button id="prev-page" class="btn btn-small">← Previous</button>
+                            <span id="page-info">Page 1 of 1</span>
+                            <button id="next-page" class="btn btn-small">Next →</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="status-message">Ready</span>
+            <span id="status-clock"></span>
+        </footer>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirm Deletion</h3>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to deactivate this patient?</p>
+                <p><strong id="delete-patient-name"></strong></p>
+                <p class="help-text">The patient record will be marked as inactive but not permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-delete" class="btn btn-danger">Deactivate</button>
+                <button onclick="closeDeleteModal()" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/ui.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/patients.js"></script>
+</body>
+</html>

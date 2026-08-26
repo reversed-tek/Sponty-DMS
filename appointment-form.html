@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Form - Dental Practice Management</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1 id="form-title">📅 New Appointment</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-name"></span>
+                <button onclick="handleLogout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-bar">
+            <a href="index.html">Dashboard</a>
+            <a href="patients.html">Patients</a>
+            <a href="appointments.html" class="active">Appointments</a>
+            <a href="#">Treatments</a>
+            <a href="#">Billing</a>
+            <a href="#">Reports</a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Back Button -->
+            <div class="toolbar">
+                <button onclick="window.location.href='appointments.html'" class="btn-secondary">
+                    ← Back to Appointments
+                </button>
+            </div>
+
+            <!-- Form Container -->
+            <div class="form-container">
+                <form id="appointment-form">
+                    <!-- Patient Selection -->
+                    <fieldset>
+                        <legend>Patient Information</legend>
+                        
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="patient-id">Patient: <span class="required">*</span></label>
+                                <select id="patient-id" required>
+                                    <option value="">-- Select Patient --</option>
+                                </select>
+                                <div class="form-help">Select the patient for this appointment</div>
+                            </div>
+                        </div>
+
+                        <div id="patient-info" class="patient-info-box" style="display: none;">
+                            <div class="info-row">
+                                <span class="info-label">Patient Number:</span>
+                                <span id="display-patient-number"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Phone:</span>
+                                <span id="display-phone"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span id="display-email"></span>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Appointment Details -->
+                    <fieldset>
+                        <legend>Appointment Details</legend>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="appointment-date">Date: <span class="required">*</span></label>
+                                <input type="date" id="appointment-date" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="appointment-time">Time: <span class="required">*</span></label>
+                                <select id="appointment-time" required>
+                                    <option value="">-- Select Time --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="appointment-type">Type: <span class="required">*</span></label>
+                                <select id="appointment-type" required>
+                                    <option value="">-- Select Type --</option>
+                                    <option value="checkup">Checkup</option>
+                                    <option value="cleaning">Cleaning</option>
+                                    <option value="filling">Filling</option>
+                                    <option value="extraction">Extraction</option>
+                                    <option value="root_canal">Root Canal</option>
+                                    <option value="crown">Crown</option>
+                                    <option value="emergency">Emergency</option>
+                                    <option value="consultation">Consultation</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="duration">Duration (minutes): <span class="required">*</span></label>
+                                <select id="duration" required>
+                                    <option value="15">15 minutes</option>
+                                    <option value="30" selected>30 minutes</option>
+                                    <option value="45">45 minutes</option>
+                                    <option value="60">60 minutes</option>
+                                    <option value="90">90 minutes</option>
+                                    <option value="120">120 minutes</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="status">Status: <span class="required">*</span></label>
+                                <select id="status" required>
+                                    <option value="scheduled" selected>Scheduled</option>
+                                    <option value="confirmed">Confirmed</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                    <option value="no_show">No Show</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dentist-id">Dentist:</label>
+                                <select id="dentist-id">
+                                    <option value="">-- Not Assigned --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="reason">Reason for Visit:</label>
+                                <textarea id="reason" rows="2" placeholder="e.g., Tooth pain, routine checkup..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="notes">Notes:</label>
+                                <textarea id="notes" rows="3" placeholder="Any additional notes or instructions..."></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Conflict Warning -->
+                    <div id="conflict-warning" class="warning-box" style="display: none;">
+                        ⚠️ <strong>Scheduling Conflict:</strong>
+                        <span id="conflict-message"></span>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="save-btn">
+                            💾 Save Appointment
+                        </button>
+                        <button type="button" onclick="window.location.href='appointments.html'" class="btn-secondary">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading" style="display: none;">
+                Processing...
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/appointment-form.js"></script>
+    <script>
+        let appointmentForm;
+
+        async function initPage() {
+            const user = await checkAuth();
+            if (!user) return;
+
+            document.getElementById('user-name').textContent = user.email;
+
+            // Get appointment ID from URL if editing
+            const urlParams = new URLSearchParams(window.location.search);
+            const appointmentId = urlParams.get('id');
+            const patientId = urlParams.get('patient_id');
+
+            appointmentForm = new AppointmentForm(appointmentId, patientId);
+            await appointmentForm.init();
+        }
+
+        async function handleLogout() {
+            await logout();
+            window.location.href = 'login.html';
+        }
+
+        // Initialize page when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPage);
+        } else {
+            initPage();
+        }
+    </script>
+</body>
+</html>

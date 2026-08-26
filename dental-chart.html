@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental Chart - Dental Practice Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="menu-icon" id="menuIcon">☰</div>
+            <div class="logo">Dental Practice Manager</div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="user-name" id="userName">Loading...</div>
+                <div class="user-role" id="userRole"></div>
+            </div>
+            <button class="btn-logout" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">Navigation</div>
+                <div class="sidebar-items">
+                    <div class="sidebar-item" data-page="dashboard">Dashboard</div>
+                    <div class="sidebar-item" data-page="patients">Patients</div>
+                    <div class="sidebar-item" data-page="appointments">Appointments</div>
+                    <div class="sidebar-item" data-page="clinical-notes">Clinical Notes</div>
+                    <div class="sidebar-item active" data-page="dental-chart">Dental Chart</div>
+                    <div class="sidebar-item" data-page="treatments">Treatments</div>
+                    <div class="sidebar-item" data-page="billing">Billing</div>
+                    <div class="sidebar-item" data-page="reports">Reports</div>
+                    <div class="sidebar-item" data-page="users">Users</div>
+                    <div class="sidebar-item" data-page="settings">Settings</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb">
+                <a href="index.html">Dashboard</a> &gt;
+                <a href="patients.html">Patients</a> &gt;
+                <a href="#" id="patientBreadcrumb">Patient</a> &gt;
+                <span>Dental Chart</span>
+            </div>
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="page-title-section">
+                    <h1 class="page-title">Dental Chart</h1>
+                    <div class="page-subtitle" id="patientInfo">Loading patient...</div>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-secondary" id="backToPatientBtn">
+                        ← Back to Patient
+                    </button>
+                    <button class="btn btn-secondary" id="printChartBtn">
+                        🖨️ Print Chart
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chart Tools -->
+            <div class="chart-tools">
+                <div class="chart-legend">
+                    <div class="legend-title">Legend:</div>
+                    <div class="legend-items">
+                        <div class="legend-item"><span class="tooth-indicator healthy"></span> Healthy</div>
+                        <div class="legend-item"><span class="tooth-indicator cavity"></span> Cavity</div>
+                        <div class="legend-item"><span class="tooth-indicator filled"></span> Filling</div>
+                        <div class="legend-item"><span class="tooth-indicator crown"></span> Crown</div>
+                        <div class="legend-item"><span class="tooth-indicator root-canal"></span> Root Canal</div>
+                        <div class="legend-item"><span class="tooth-indicator missing"></span> Missing</div>
+                        <div class="legend-item"><span class="tooth-indicator implant"></span> Implant</div>
+                    </div>
+                </div>
+                <div class="chart-actions">
+                    <button class="btn btn-sm btn-secondary" id="clearSelectionBtn">Clear Selection</button>
+                    <select id="quickConditionSelect" class="filter-select">
+                        <option value="">Quick Add Condition</option>
+                        <option value="healthy">Healthy</option>
+                        <option value="cavity">Cavity</option>
+                        <option value="filled">Filling</option>
+                        <option value="crown">Crown</option>
+                        <option value="root_canal">Root Canal</option>
+                        <option value="missing">Missing</option>
+                        <option value="implant">Implant</option>
+                        <option value="fractured">Fractured</option>
+                        <option value="impacted">Impacted</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dental Chart -->
+            <div class="dental-chart-container">
+                <!-- Upper Jaw -->
+                <div class="jaw-section">
+                    <div class="jaw-label">Upper Jaw (Maxillary)</div>
+                    <div class="teeth-row upper-right" id="upperRight">
+                        <!-- Quadrant 1: Upper Right (18-11) -->
+                    </div>
+                    <div class="teeth-row upper-left" id="upperLeft">
+                        <!-- Quadrant 2: Upper Left (21-28) -->
+                    </div>
+                </div>
+
+                <!-- Lower Jaw -->
+                <div class="jaw-section">
+                    <div class="jaw-label">Lower Jaw (Mandibular)</div>
+                    <div class="teeth-row lower-right" id="lowerRight">
+                        <!-- Quadrant 4: Lower Right (48-41) -->
+                    </div>
+                    <div class="teeth-row lower-left" id="lowerLeft">
+                        <!-- Quadrant 3: Lower Left (31-38) -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Tooth Info -->
+            <div id="selectedToothInfo" class="selected-tooth-panel" style="display: none;">
+                <div class="panel-header">
+                    <h3>Tooth <span id="selectedToothNumber"></span></h3>
+                    <button class="btn-icon" id="closeToothInfo">✖</button>
+                </div>
+                <div class="panel-body">
+                    <div class="tooth-info-section">
+                        <h4>Current Conditions</h4>
+                        <div id="toothConditionsList">
+                            <p class="text-muted">No conditions recorded</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="addToothConditionBtn">+ Add Condition</button>
+                    </div>
+                    <div class="tooth-info-section">
+                        <h4>History</h4>
+                        <div id="toothHistoryList">
+                            <p class="text-muted">No history available</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Records List -->
+            <div class="chart-records-section">
+                <div class="section-header">
+                    <h2>Chart Records History</h2>
+                    <div class="filters-inline">
+                        <input type="text" id="searchRecords" placeholder="Search records..." class="filter-input">
+                        <select id="filterByTooth" class="filter-select">
+                            <option value="">All Teeth</option>
+                        </select>
+                        <select id="filterByCondition" class="filter-select">
+                            <option value="">All Conditions</option>
+                            <option value="healthy">Healthy</option>
+                            <option value="cavity">Cavity</option>
+                            <option value="filled">Filling</option>
+                            <option value="crown">Crown</option>
+                            <option value="root_canal">Root Canal</option>
+                            <option value="missing">Missing</option>
+                            <option value="implant">Implant</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="recordsContainer">
+                    <div class="loading-message">Loading chart records...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Tooth Condition Modal -->
+    <div id="toothConditionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="conditionModalTitle">Add Tooth Condition</h2>
+                <span class="close" id="closeConditionModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="toothConditionForm">
+                    <input type="hidden" id="recordId">
+                    <input type="hidden" id="toothNumberInput">
+                    
+                    <div class="form-group">
+                        <label>Tooth Number</label>
+                        <input type="text" id="toothNumberDisplay" readonly class="form-control-readonly">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conditionType">Condition Type *</label>
+                        <select id="conditionType" required>
+                            <option value="healthy">Healthy</option>
+                            <option value="cavity">Cavity</option>
+                            <option value="filled">Filling</option>
+                            <option value="crown">Crown</option>
+                            <option value="root_canal">Root Canal</option>
+                            <option value="missing">Missing</option>
+                            <option value="implant">Implant</option>
+                            <option value="bridge">Bridge</option>
+                            <option value="fractured">Fractured</option>
+                            <option value="impacted">Impacted</option>
+                            <option value="extracted">Extracted</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="surface">Surface (if applicable)</label>
+                        <input type="text" id="surface" placeholder="e.g., Occlusal, Mesial, Distal">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="severity">Severity</label>
+                        <select id="severity">
+                            <option value="">Not specified</option>
+                            <option value="mild">Mild</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="severe">Severe</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="recordDate">Record Date *</label>
+                            <input type="date" id="recordDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="treatmentDate">Treatment Date (if applicable)</label>
+                            <input type="date" id="treatmentDate">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conditionNotes">Notes</label>
+                        <textarea id="conditionNotes" rows="3" placeholder="Additional details about the condition"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="requiresFollowup">
+                            Requires Follow-up
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelConditionBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveConditionBtn">Save Condition</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/dental-chart.js"></script>
+</body>
+</html>
