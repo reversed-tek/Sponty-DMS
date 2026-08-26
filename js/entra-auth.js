@@ -1,8 +1,6 @@
-import { supabase } from './supabase.js';
-import * as msalModule from 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/+esm';
 
-// Resolve MSAL library from ES module import or global window fallback
-const msal = msalModule?.PublicClientApplication ? msalModule : (window.msal || window.Msal);
+
+import { supabase } from './supabase.js';
 
 // MSAL Configuration
 let msalInstance = null;
@@ -12,9 +10,15 @@ let msalConfig = null;
  * Initialize MSAL with provided configuration
  * @param {Object} config - Entra configuration object
  */
-export function initializeEntraAuth(config) {
+export async function initializeEntraAuth(config) {
     if (!config) {
         throw new Error('Entra configuration object is missing.');
+    }
+
+    // Safely retrieve MSAL from global window object
+    const msalLib = window.msal || window.Msal;
+    if (!msalLib) {
+        throw new Error('MSAL SDK missing. Ensure msal-browser.min.js script tag is present in your HTML head.');
     }
 
     msalConfig = {
@@ -40,16 +44,17 @@ export function initializeEntraAuth(config) {
         }
     };
 
-    // Initialize MSAL instance
-    msalInstance = new msal.PublicClientApplication(msalConfig);
+    // Initialize MSAL instance safely
+    msalInstance = new msalLib.PublicClientApplication(msalConfig);
     
     // Handle redirect promise
-    return msalInstance.handleRedirectPromise()
-        .then(handleRedirectResponse)
-        .catch(error => {
-            console.error('MSAL redirect error:', error);
-            throw error;
-        });
+    try {
+        const response = await msalInstance.handleRedirectPromise();
+        return handleRedirectResponse(response);
+    } catch (error) {
+        console.error('MSAL redirect error:', error);
+        throw error;
+    }
 }
 
 /**
@@ -283,7 +288,8 @@ export async function acquireTokenSilently(scopes = ['User.Read']) {
     } catch (error) {
         console.error('Token acquisition error:', error);
         
-        if (msal?.InteractionRequiredAuthError && error instanceof msal.InteractionRequiredAuthError) {
+        const msalLib = window.msal || window.Msal;
+        if (msalLib?.InteractionRequiredAuthError && error instanceof msalLib.InteractionRequiredAuthError) {
             await msalInstance.acquireTokenRedirect(request);
         }
         
@@ -426,7 +432,8 @@ export function handleAuthError(error) {
         };
     }
 
-    if (msal?.BrowserAuthError && error instanceof msal.BrowserAuthError) {
+    const msalLib = window.msal || window.Msal;
+    if (msalLib?.BrowserAuthError && error instanceof msalLib.BrowserAuthError) {
         return {
             title: 'Authentication Error',
             message: 'Failed to authenticate with Microsoft. Please try again.',
