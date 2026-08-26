@@ -8,8 +8,14 @@
     <!-- Prevent missing favicon 404 console error -->
     <link rel="shortcut icon" href="#">
 
-    <!-- Single MSAL Browser CDN Load -->
+    <!-- Primary MSAL Browser CDN Load -->
     <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <!-- Secondary CDN Fallback if primary fails/blocked -->
+    <script>
+        if (typeof msal === 'undefined' && !window.msal) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+        }
+    </script>
 
     <style>
         * {
@@ -198,7 +204,7 @@
             try {
                 // Verify MSAL SDK availability prior to initialization
                 if (typeof msal === 'undefined' && !window.msal) {
-                    throw new Error('MSAL SDK failed to load from CDN. Check your network or ad-blocker settings.');
+                    throw new Error('MSAL SDK failed to load from all CDNs. Check network connection or ad-blocker settings.');
                 }
 
                 await initializeEntraAuth(entraConfig);
