@@ -12,7 +12,16 @@
     <link rel="stylesheet" href="css/print.css">
 
     <!-- MSAL SDK (Required before js/app.js loads) -->
-    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <!-- Primary MSAL Browser CDN Load -->
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<!-- Secondary CDN Fallback if primary fails/blocked -->
+<script>
+    if (typeof msal === 'undefined' && !window.msal) {
+        document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+    }
+</script>
+<!-- Application Script -->
+<script type="module" src="js/app.js"></script>
 
     <!-- Application Script -->
     <script type="module" src="js/app.js"></script>
