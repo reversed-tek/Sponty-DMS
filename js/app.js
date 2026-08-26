@@ -3,6 +3,7 @@ import { checkAuth, logout, getCurrentUserWithProfile } from './auth.js';
 import { supabase, checkSupabaseConfig } from './supabase.js';
 import { showNotification, formatDate, formatTime } from './ui.js';
 import { isToday } from './utils.js';
+import { initializeEntraAuth, getCurrentSession } from './entra-auth.js';
 
 // Make logout available globally
 window.logout = logout;
@@ -10,7 +11,12 @@ window.logout = logout;
 // Initialize app
 async function init() {
     try {
-        // Check authentication
+        // Step 1: Process Entra auth state/redirects BEFORE checking auth status
+        if (typeof initializeEntraAuth === 'function') {
+            await initializeEntraAuth();
+        }
+
+        // Step 2: Now safe to verify authentication state
         const user = await checkAuth();
         if (!user) return;
         
@@ -54,7 +60,7 @@ async function loadUserInfo() {
     } catch (error) {
         console.error('Error loading user info:', error);
         // Use fallback from Entra session
-        const session = await import('./entra-auth.js').then(m => m.getCurrentSession());
+        const session = await getCurrentSession();
         if (session) {
             const displayName = session.first_name 
                 ? `${session.first_name} ${session.last_name || ''}`.trim()
