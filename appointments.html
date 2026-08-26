@@ -15,7 +15,7 @@
             </div>
             <div class="header-right">
                 <span id="user-name"></span>
-                <button onclick="handleLogout()" class="btn-secondary">Logout</button>
+                <button id="logout-btn" class="btn-secondary">Logout</button>
             </div>
         </div>
 
@@ -34,32 +34,32 @@
             <!-- Toolbar -->
             <div class="toolbar">
                 <div class="toolbar-left">
-                    <button onclick="appointmentManager.showAddForm()" class="btn-primary">
+                    <button id="btn-add-appointment" class="btn-primary">
                         ➕ New Appointment
                     </button>
-                    <button onclick="appointmentManager.goToToday()" class="btn-secondary">
+                    <button id="btn-today" class="btn-secondary">
                         📍 Today
                     </button>
                     <div class="button-group">
-                        <button onclick="appointmentManager.changeView('day')" class="btn-secondary" id="view-day">
+                        <button class="btn-secondary" id="view-day">
                             Day
                         </button>
-                        <button onclick="appointmentManager.changeView('week')" class="btn-secondary" id="view-week">
+                        <button class="btn-secondary" id="view-week">
                             Week
                         </button>
-                        <button onclick="appointmentManager.changeView('month')" class="btn-secondary" id="view-month">
+                        <button class="btn-secondary" id="view-month">
                             Month
                         </button>
-                        <button onclick="appointmentManager.changeView('list')" class="btn-secondary" id="view-list">
+                        <button class="btn-secondary" id="view-list">
                             List
                         </button>
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <button onclick="appointmentManager.exportToCSV()" class="btn-secondary">
+                    <button id="btn-export-csv" class="btn-secondary">
                         💾 Export CSV
                     </button>
-                    <button onclick="appointmentManager.printSchedule()" class="btn-secondary">
+                    <button id="btn-print" class="btn-secondary">
                         🖨️ Print
                     </button>
                 </div>
@@ -67,9 +67,9 @@
 
             <!-- Date Navigation -->
             <div class="date-navigation">
-                <button onclick="appointmentManager.previousPeriod()" class="btn-nav">◀ Previous</button>
+                <button id="btn-prev-period" class="btn-nav">◀ Previous</button>
                 <h2 id="current-period"></h2>
-                <button onclick="appointmentManager.nextPeriod()" class="btn-nav">Next ▶</button>
+                <button id="btn-next-period" class="btn-nav">Next ▶</button>
             </div>
 
             <!-- Filters Panel -->
@@ -111,7 +111,7 @@
                         <option value="">All Patients</option>
                     </select>
                 </div>
-                <button onclick="appointmentManager.clearFilters()" class="btn-secondary">Clear Filters</button>
+                <button id="btn-clear-filters" class="btn-secondary">Clear Filters</button>
             </div>
 
             <!-- Calendar/List Container -->
@@ -127,12 +127,15 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/supabase.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/appointments.js"></script>
-    <script>
+    <script type="module" src="js/supabase.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/ui.js"></script>
+    <script type="module" src="js/appointments.js"></script>
+    <script type="module">
+        import { checkAuth, logout } from './js/auth.js';
+        import { AppointmentManager } from './js/appointments.js';
+
         let appointmentManager;
 
         async function initPage() {
@@ -143,6 +146,23 @@
 
             appointmentManager = new AppointmentManager();
             await appointmentManager.init();
+
+            wireUpButtons();
+        }
+
+        function wireUpButtons() {
+            document.getElementById('logout-btn').addEventListener('click', handleLogout);
+            document.getElementById('btn-add-appointment').addEventListener('click', () => appointmentManager.showAddForm());
+            document.getElementById('btn-today').addEventListener('click', () => appointmentManager.goToToday());
+            document.getElementById('view-day').addEventListener('click', () => appointmentManager.changeView('day'));
+            document.getElementById('view-week').addEventListener('click', () => appointmentManager.changeView('week'));
+            document.getElementById('view-month').addEventListener('click', () => appointmentManager.changeView('month'));
+            document.getElementById('view-list').addEventListener('click', () => appointmentManager.changeView('list'));
+            document.getElementById('btn-export-csv').addEventListener('click', () => appointmentManager.exportToCSV());
+            document.getElementById('btn-print').addEventListener('click', () => appointmentManager.printSchedule());
+            document.getElementById('btn-prev-period').addEventListener('click', () => appointmentManager.previousPeriod());
+            document.getElementById('btn-next-period').addEventListener('click', () => appointmentManager.nextPeriod());
+            document.getElementById('btn-clear-filters').addEventListener('click', () => appointmentManager.clearFilters());
         }
 
         async function handleLogout() {
