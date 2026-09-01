@@ -3,36 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dental Clinic Management System</title>
+    <title>SpontyDMS</title>
 
-    <!-- App Stylesheets -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/forms.css">
     <link rel="stylesheet" href="css/tables.css">
     <link rel="stylesheet" href="css/print.css">
     <link rel="icon" href="data:,">
 
-    <!-- MSAL SDK (Required before js/app.js loads) -->
-    <!-- Primary MSAL Browser CDN Load -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
-<!-- Secondary CDN Fallback if primary fails/blocked -->
-<script>
-    if (typeof msal === 'undefined' && !window.msal) {
-        document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
-    }
-</script>
-<!-- Application Script -->
-<script type="module" src="js/app.js"></script>
+    <!-- MSAL SDK -->
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <script>
+        if (typeof msal === 'undefined' && !window.msal) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+        }
+    </script>
 
-    <!-- Application Script -->
+    <!-- Application Script (only once) -->
     <script type="module" src="js/app.js"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Application Header -->
+        <!-- Header -->
         <div class="app-header">
             <div class="app-title">
-                <div class="app-title-icon"></div>
+                <span style="font-size:16px;">🦷</span>
                 <span>Dental Clinic Management System</span>
             </div>
             <div class="app-header-actions">
@@ -40,7 +35,7 @@
                 <button class="header-btn" id="logoutBtn">Logout</button>
             </div>
         </div>
-        
+
         <!-- Menu Bar -->
         <div class="menu-bar">
             <div class="menu-item">File</div>
@@ -49,7 +44,7 @@
             <div class="menu-item">Reports</div>
             <div class="menu-item">Help</div>
         </div>
-        
+
         <!-- Main Content -->
         <div class="main-content">
             <!-- Sidebar -->
@@ -70,12 +65,11 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Content Area -->
             <div class="content-area" id="contentArea">
                 <div class="page-title">Dashboard</div>
-                
-                <!-- Stats Grid -->
+
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="stat-label">Today's Appointments</div>
@@ -94,8 +88,7 @@
                         <div class="stat-value" id="statUnpaidInvoices">-</div>
                     </div>
                 </div>
-                
-                <!-- Recent Patients -->
+
                 <div class="panel">
                     <div class="panel-header">Recent Patients</div>
                     <div class="panel-body">
@@ -111,16 +104,13 @@
                                     </tr>
                                 </thead>
                                 <tbody id="recentPatientsTable">
-                                    <tr>
-                                        <td colspan="5" class="table-empty">Loading...</td>
-                                    </tr>
+                                    <tr><td colspan="5" class="table-empty">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Today's Schedule -->
+
                 <div class="panel">
                     <div class="panel-header">Today's Schedule</div>
                     <div class="panel-body">
@@ -135,9 +125,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="todayScheduleTable">
-                                    <tr>
-                                        <td colspan="4" class="table-empty">Loading...</td>
-                                    </tr>
+                                    <tr><td colspan="4" class="table-empty">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -145,7 +133,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Status Bar -->
         <div class="status-bar">
             <div style="display: flex;">
