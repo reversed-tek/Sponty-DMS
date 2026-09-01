@@ -17,11 +17,9 @@ class PatientManager {
     }
     
     async init() {
-        // Check authentication
         const user = await checkAuth();
         if (!user) return;
         
-        // Get user profile
         const profile = await window.supabaseClient
             .from('profiles')
             .select('clinic_id')
@@ -35,15 +33,11 @@ class PatientManager {
         
         this.clinicId = profile.data.clinic_id;
         
-        // Setup event listeners
         this.setupEventListeners();
-        
-        // Load initial data
         await this.loadPatients();
     }
     
     setupEventListeners() {
-        // Search
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         
@@ -57,7 +51,6 @@ class PatientManager {
             searchBtn.addEventListener('click', () => this.handleSearch());
         }
         
-        // Advanced filters
         const filterBtn = document.getElementById('filterBtn');
         const applyFiltersBtn = document.getElementById('applyFilters');
         const resetFiltersBtn = document.getElementById('resetFilters');
@@ -74,7 +67,6 @@ class PatientManager {
             resetFiltersBtn.addEventListener('click', () => this.resetFilters());
         }
         
-        // Sorting
         const sortField = document.getElementById('sortField');
         const sortOrder = document.getElementById('sortOrder');
         
@@ -86,7 +78,6 @@ class PatientManager {
             sortOrder.addEventListener('change', () => this.handleSort());
         }
         
-        // Page size
         const pageSize = document.getElementById('pageSize');
         if (pageSize) {
             pageSize.addEventListener('change', (e) => {
@@ -96,7 +87,6 @@ class PatientManager {
             });
         }
         
-        // Actions
         const exportBtn = document.getElementById('exportBtn');
         const printBtn = document.getElementById('printBtn');
         
@@ -108,11 +98,11 @@ class PatientManager {
             printBtn.addEventListener('click', () => this.printList());
         }
         
-        // Add patient button
+        // Add patient — navigate in-shell instead of hard redirect
         const addBtn = document.getElementById('addPatientBtn');
         if (addBtn) {
             addBtn.addEventListener('click', () => {
-                window.location.href = 'patient-add.html';
+                window.dispatchEvent(new CustomEvent('navigate', { detail: { page: 'patient-add' } }));
             });
         }
     }
@@ -121,19 +111,16 @@ class PatientManager {
         try {
             showLoading('patientsTable');
             
-            // Build query
             let query = window.supabaseClient
                 .from('patients')
                 .select('*', { count: 'exact' })
                 .eq('clinic_id', this.clinicId);
             
-            // Apply search
             if (this.currentFilters.search) {
                 const search = `%${this.currentFilters.search}%`;
                 query = query.or(`first_name.ilike.${search},last_name.ilike.${search},patient_number.ilike.${search},phone.ilike.${search},email.ilike.${search}`);
             }
             
-            // Apply filters
             if (this.currentFilters.gender) {
                 query = query.eq('gender', this.currentFilters.gender);
             }
@@ -154,12 +141,10 @@ class PatientManager {
                 query = query.gte('date_of_birth', minDate.toISOString().split('T')[0]);
             }
             
-            // Apply sorting
             query = query.order(this.currentSort.field, { 
                 ascending: this.currentSort.order === 'asc' 
             });
             
-            // Apply pagination
             const from = (this.currentPage - 1) * this.pageSize;
             const to = from + this.pageSize - 1;
             query = query.range(from, to);
@@ -171,6 +156,10 @@ class PatientManager {
             this.patients = data || [];
             this.totalRecords = count || 0;
             this.totalPages = Math.ceil(this.totalRecords / this.pageSize);
+
+            // Update patient count badge
+            const countBadge = document.getElementById('patient-count');
+            if (countBadge) countBadge.textContent = this.totalRecords;
             
             this.renderPatients();
             this.renderPagination();
@@ -207,7 +196,7 @@ class PatientManager {
                 <tr>
                     <td>${escapeHtml(patient.patient_number)}</td>
                     <td>
-                        <a href="patient-view.html?id=${patient.id}" class="link">
+                        <a href="#" class="link" onclick="patientManager.viewPatient('${patient.id}'); return false;">
                             ${escapeHtml(patient.first_name)} ${escapeHtml(patient.last_name)}
                         </a>
                     </td>
@@ -246,23 +235,18 @@ class PatientManager {
         }
         
         let pages = [];
-        
-        // Always show first page
         pages.push(1);
         
-        // Show pages around current page
         for (let i = Math.max(2, this.currentPage - 1); i <= Math.min(this.totalPages - 1, this.currentPage + 1); i++) {
             if (!pages.includes(i)) pages.push(i);
         }
         
-        // Always show last page
         if (!pages.includes(this.totalPages)) {
             pages.push(this.totalPages);
         }
         
         let html = '<div class="pagination">';
         
-        // Previous button
         html += `
             <button class="btn-small" ${this.currentPage === 1 ? 'disabled' : ''} 
                 onclick="patientManager.goToPage(${this.currentPage - 1})">
@@ -270,7 +254,6 @@ class PatientManager {
             </button>
         `;
         
-        // Page numbers
         let lastPage = 0;
         pages.forEach(page => {
             if (page > lastPage + 1) {
@@ -287,7 +270,6 @@ class PatientManager {
             lastPage = page;
         });
         
-        // Next button
         html += `
             <button class="btn-small" ${this.currentPage === this.totalPages ? 'disabled' : ''} 
                 onclick="patientManager.goToPage(${this.currentPage + 1})">
@@ -297,7 +279,6 @@ class PatientManager {
         
         html += '</div>';
         
-        // Page info
         const from = (this.currentPage - 1) * this.pageSize + 1;
         const to = Math.min(this.currentPage * this.pageSize, this.totalRecords);
         
@@ -352,18 +333,15 @@ class PatientManager {
     }
     
     resetFilters() {
-        // Clear filter inputs
         const filterInputs = ['filterGender', 'filterStatus', 'filterAgeFrom', 'filterAgeTo'];
         filterInputs.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
         
-        // Clear search
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
         
-        // Reset filters
         this.currentFilters = {};
         this.currentPage = 1;
         this.loadPatients();
@@ -382,11 +360,11 @@ class PatientManager {
     }
     
     viewPatient(id) {
-        window.location.href = `patient-view.html?id=${id}`;
+        window.dispatchEvent(new CustomEvent('navigate', { detail: { page: 'patient-view', id } }));
     }
     
     editPatient(id) {
-        window.location.href = `patient-edit.html?id=${id}`;
+        window.dispatchEvent(new CustomEvent('navigate', { detail: { page: 'patient-edit', id } }));
     }
     
     confirmDelete(id, name) {
@@ -399,7 +377,6 @@ class PatientManager {
             patientNameEl.textContent = name;
             modal.classList.remove('hidden');
             
-            // Remove old listeners
             const newConfirmBtn = confirmBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
             
@@ -418,7 +395,6 @@ class PatientManager {
     
     async deletePatient(id) {
         try {
-            // Soft delete - set status to inactive
             const { error } = await window.supabaseClient
                 .from('patients')
                 .update({ 
@@ -442,13 +418,11 @@ class PatientManager {
         try {
             showNotification('Preparing export...', 'info');
             
-            // Fetch all patients with current filters (no pagination)
             let query = window.supabaseClient
                 .from('patients')
                 .select('*')
                 .eq('clinic_id', this.clinicId);
             
-            // Apply same filters as current view
             if (this.currentFilters.search) {
                 const search = `%${this.currentFilters.search}%`;
                 query = query.or(`first_name.ilike.${search},last_name.ilike.${search},patient_number.ilike.${search},phone.ilike.${search},email.ilike.${search}`);
@@ -466,7 +440,6 @@ class PatientManager {
             
             if (error) throw error;
             
-            // Create CSV
             const headers = ['Patient Number', 'First Name', 'Last Name', 'Date of Birth', 'Age', 'Gender', 'Phone', 'Email', 'Address', 'Status', 'Created Date'];
             const rows = data.map(p => [
                 p.patient_number,
@@ -487,7 +460,6 @@ class PatientManager {
                 ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
             ].join('\n');
             
-            // Download
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -511,7 +483,6 @@ class PatientManager {
     }
 }
 
-// Initialize
 let patientManager;
 document.addEventListener('DOMContentLoaded', () => {
     patientManager = new PatientManager();
