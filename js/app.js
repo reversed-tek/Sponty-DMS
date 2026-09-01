@@ -84,9 +84,10 @@ async function loadUserInfo() {
     // Use fallback from Entra session
     const session = getCurrentSession();
     if (session) {
-        const displayName = session.first_name 
-            ? `${session.first_name} ${session.last_name || ''}`.trim()
-            : session.email;
+        const displayName = session.full_name ||
+            (session.first_name ? `${session.first_name} ${session.last_name || ''}`.trim() : null) ||
+            session.email ||
+            'User';
         const role = session.role || 'User';
         updateUserDisplay(displayName, role);
     }
@@ -264,7 +265,6 @@ async function loadPage(page) {
     
     switch(page) {
         case 'dashboard':
-            // Restore original dashboard HTML structure before populating data
             contentArea.innerHTML = dashboardTemplate;
             contentArea.scrollTop = 0;
             await loadDashboard();
@@ -329,19 +329,23 @@ async function fetchAndRenderPage(htmlFile, modulePath) {
         
         const rawHtml = await response.text();
         
-        // Parse raw HTML string to strip <html>, <head>, and <body> wrappers
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
         
-        // Extract inner content from target container or body
-        const container = doc.querySelector('.content-area') || 
-                          doc.querySelector('.main-content') || 
+        // Try known container classes, then any *-container, then fall back to body
+        const container = doc.querySelector('.content-area') ||
+                          doc.querySelector('.main-content') ||
+                          doc.querySelector('.users-container') ||
+                          doc.querySelector('.patients-container') ||
+                          doc.querySelector('.appointments-container') ||
+                          doc.querySelector('.clinical-notes-container') ||
+                          doc.querySelector('.dental-chart-container') ||
+                          doc.querySelector('[class$="-container"]') ||
                           doc.body;
                           
         contentArea.innerHTML = container ? container.innerHTML : rawHtml;
         contentArea.scrollTop = 0;
 
-        // Load and execute module if available
         if (modulePath) {
             const module = await import(modulePath);
             if (typeof module.init === 'function') {
