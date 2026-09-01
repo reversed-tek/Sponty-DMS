@@ -409,7 +409,6 @@ body {
    APPOINTMENT CALENDAR STYLES
 ======================================== */
 
-/* Calendar Container */
 .calendar-container {
     background: white;
     border-radius: 8px;
@@ -418,7 +417,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* Calendar Header */
 .calendar-header {
     display: flex;
     justify-content: space-between;
@@ -462,7 +460,6 @@ body {
     background: rgba(255,255,255,0.5);
 }
 
-/* Date Navigation */
 .date-navigation {
     display: flex;
     gap: 10px;
@@ -491,7 +488,6 @@ body {
     text-align: center;
 }
 
-/* Calendar Grid - Week View */
 .calendar-grid {
     display: grid;
     grid-template-columns: 80px repeat(7, 1fr);
@@ -537,12 +533,10 @@ body {
     background: #fafafa;
 }
 
-/* Calendar Grid - Day View */
 .calendar-grid.day-view {
     grid-template-columns: 80px 1fr;
 }
 
-/* Calendar Grid - Month View */
 .calendar-grid.month-view {
     grid-template-columns: repeat(7, 1fr);
 }
@@ -571,7 +565,6 @@ body {
     color: #333;
 }
 
-/* Appointment Card */
 .appointment-card {
     background: white;
     border-left: 4px solid #2196F3;
@@ -605,38 +598,13 @@ body {
     font-size: 12px;
 }
 
-/* Appointment Status Colors */
-.appointment-card.scheduled {
-    border-left-color: #2196F3;
-    background: #E3F2FD;
-}
+.appointment-card.scheduled { border-left-color: #2196F3; background: #E3F2FD; }
+.appointment-card.confirmed { border-left-color: #4CAF50; background: #E8F5E9; }
+.appointment-card.in-progress { border-left-color: #FF9800; background: #FFF3E0; }
+.appointment-card.completed { border-left-color: #9E9E9E; background: #F5F5F5; }
+.appointment-card.cancelled { border-left-color: #F44336; background: #FFEBEE; }
+.appointment-card.no-show { border-left-color: #9C27B0; background: #F3E5F5; }
 
-.appointment-card.confirmed {
-    border-left-color: #4CAF50;
-    background: #E8F5E9;
-}
-
-.appointment-card.in-progress {
-    border-left-color: #FF9800;
-    background: #FFF3E0;
-}
-
-.appointment-card.completed {
-    border-left-color: #9E9E9E;
-    background: #F5F5F5;
-}
-
-.appointment-card.cancelled {
-    border-left-color: #F44336;
-    background: #FFEBEE;
-}
-
-.appointment-card.no-show {
-    border-left-color: #9C27B0;
-    background: #F3E5F5;
-}
-
-/* List View */
 .appointments-list {
     display: flex;
     flex-direction: column;
@@ -694,7 +662,6 @@ body {
     color: #333;
 }
 
-/* Appointment Status Badge */
 .appointment-status {
     display: inline-block;
     padding: 4px 12px;
@@ -704,37 +671,13 @@ body {
     text-transform: uppercase;
 }
 
-.appointment-status.scheduled {
-    background: #E3F2FD;
-    color: #1976D2;
-}
+.appointment-status.scheduled { background: #E3F2FD; color: #1976D2; }
+.appointment-status.confirmed { background: #E8F5E9; color: #388E3C; }
+.appointment-status.in-progress { background: #FFF3E0; color: #F57C00; }
+.appointment-status.completed { background: #F5F5F5; color: #616161; }
+.appointment-status.cancelled { background: #FFEBEE; color: #D32F2F; }
+.appointment-status.no-show { background: #F3E5F5; color: #7B1FA2; }
 
-.appointment-status.confirmed {
-    background: #E8F5E9;
-    color: #388E3C;
-}
-
-.appointment-status.in-progress {
-    background: #FFF3E0;
-    color: #F57C00;
-}
-
-.appointment-status.completed {
-    background: #F5F5F5;
-    color: #616161;
-}
-
-.appointment-status.cancelled {
-    background: #FFEBEE;
-    color: #D32F2F;
-}
-
-.appointment-status.no-show {
-    background: #F3E5F5;
-    color: #7B1FA2;
-}
-
-/* Appointment Detail Page */
 .appointment-detail {
     background: white;
     border-radius: 8px;
@@ -805,7 +748,6 @@ body {
     text-align: right;
 }
 
-/* Quick Actions */
 .quick-actions {
     display: flex;
     gap: 10px;
@@ -820,7 +762,6 @@ body {
     font-size: 13px;
 }
 
-/* Conflict Warning */
 .conflict-warning {
     background: #FFF3E0;
     border: 1px solid #FF9800;
@@ -837,22 +778,10 @@ body {
     font-size: 20px;
 }
 
-.conflict-warning-content {
-    flex: 1;
-}
+.conflict-warning-content { flex: 1; }
+.conflict-warning-title { font-weight: 600; color: #E65100; margin-bottom: 4px; }
+.conflict-warning-message { color: #666; font-size: 14px; }
 
-.conflict-warning-title {
-    font-weight: 600;
-    color: #E65100;
-    margin-bottom: 4px;
-}
-
-.conflict-warning-message {
-    color: #666;
-    font-size: 14px;
-}
-
-/* Empty State */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -870,7 +799,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* Print Styles for Appointments */
 @media print {
     .appointment-card,
     .appointment-item {
@@ -878,18 +806,11 @@ body {
         box-shadow: none;
         border: 1px solid #ddd;
     }
-    
-    .calendar-grid {
-        page-break-inside: auto;
-    }
-    
+    .calendar-grid { page-break-inside: auto; }
     .appointment-detail-actions,
-    .quick-actions {
-        display: none;
-    }
+    .quick-actions { display: none; }
 }
 
-/* Mobile Responsive */
 @media (max-width: 768px) {
     .sidebar {
         position: fixed;
@@ -899,21 +820,15 @@ body {
         z-index: 1000;
         transition: left 0.3s;
     }
-    
-    .sidebar.open {
-        left: 0;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
+    .sidebar.open { left: 0; }
+    .stats-grid { grid-template-columns: 1fr; }
 }
+
 
 /* ============================================
    PART 4: DENTAL RECORDS MANAGEMENT STYLES
    ============================================ */
 
-/* Clinical Notes Styles */
 .notes-header {
     display: flex;
     justify-content: space-between;
@@ -921,10 +836,7 @@ body {
     margin-bottom: 1.5rem;
 }
 
-.notes-actions {
-    display: flex;
-    gap: 0.5rem;
-}
+.notes-actions { display: flex; gap: 0.5rem; }
 
 .medical-alerts {
     background: #fff3cd;
@@ -943,16 +855,8 @@ body {
     gap: 0.5rem;
 }
 
-.alert-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.alert-list li {
-    padding: 0.3rem 0;
-    color: #856404;
-}
+.alert-list { list-style: none; padding: 0; margin: 0; }
+.alert-list li { padding: 0.3rem 0; color: #856404; }
 
 .notes-filters {
     display: flex;
@@ -961,23 +865,10 @@ body {
     flex-wrap: wrap;
 }
 
-.filter-group {
-    flex: 1;
-    min-width: 200px;
-}
+.filter-group { flex: 1; min-width: 200px; }
+.filter-group label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: #666; }
 
-.filter-group label {
-    display: block;
-    margin-bottom: 0.3rem;
-    font-size: 0.85rem;
-    color: #666;
-}
-
-.notes-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+.notes-list { display: flex; flex-direction: column; gap: 1rem; }
 
 .note-card {
     background: white;
@@ -987,9 +878,7 @@ body {
     transition: box-shadow 0.2s;
 }
 
-.note-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
+.note-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 
 .note-header {
     display: flex;
@@ -998,12 +887,7 @@ body {
     margin-bottom: 0.75rem;
 }
 
-.note-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
+.note-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
 .note-category {
     display: inline-block;
@@ -1014,30 +898,11 @@ body {
     text-transform: uppercase;
 }
 
-.note-category.general {
-    background: #e3f2fd;
-    color: #1976d2;
-}
-
-.note-category.follow-up {
-    background: #fff3e0;
-    color: #f57c00;
-}
-
-.note-category.emergency {
-    background: #ffebee;
-    color: #d32f2f;
-}
-
-.note-category.consultation {
-    background: #f3e5f5;
-    color: #7b1fa2;
-}
-
-.note-category.treatment {
-    background: #e8f5e9;
-    color: #388e3c;
-}
+.note-category.general { background: #e3f2fd; color: #1976d2; }
+.note-category.follow-up { background: #fff3e0; color: #f57c00; }
+.note-category.emergency { background: #ffebee; color: #d32f2f; }
+.note-category.consultation { background: #f3e5f5; color: #7b1fa2; }
+.note-category.treatment { background: #e8f5e9; color: #388e3c; }
 
 .note-private {
     background: #fff9c4;
@@ -1045,31 +910,11 @@ body {
     padding-left: 1rem;
 }
 
-.note-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.note-body {
-    color: #333;
-}
-
-.note-section {
-    margin-bottom: 0.75rem;
-}
-
-.note-section strong {
-    color: #555;
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-}
-
-.note-section p {
-    margin: 0;
-    color: #666;
-    line-height: 1.5;
-}
+.note-actions { display: flex; gap: 0.5rem; }
+.note-body { color: #333; }
+.note-section { margin-bottom: 0.75rem; }
+.note-section strong { color: #555; display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
+.note-section p { margin: 0; color: #666; line-height: 1.5; }
 
 .note-footer {
     margin-top: 0.75rem;
@@ -1082,12 +927,8 @@ body {
     align-items: center;
 }
 
-.note-meta {
-    display: flex;
-    gap: 1rem;
-}
+.note-meta { display: flex; gap: 1rem; }
 
-/* Medical History Styles */
 .history-tabs {
     display: flex;
     gap: 0.5rem;
@@ -1106,23 +947,11 @@ body {
     transition: all 0.2s;
 }
 
-.tab-btn:hover {
-    background: #f5f5f5;
-}
+.tab-btn:hover { background: #f5f5f5; }
+.tab-btn.active { color: #4CAF50; border-bottom-color: #4CAF50; font-weight: 500; }
 
-.tab-btn.active {
-    color: #4CAF50;
-    border-bottom-color: #4CAF50;
-    font-weight: 500;
-}
-
-.tab-content {
-    display: none;
-}
-
-.tab-content.active {
-    display: block;
-}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 
 .history-section-header {
     display: flex;
@@ -1131,11 +960,7 @@ body {
     margin-bottom: 1rem;
 }
 
-.history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+.history-list { display: flex; flex-direction: column; gap: 1rem; }
 
 .history-card {
     background: white;
@@ -1145,9 +970,7 @@ body {
     transition: box-shadow 0.2s;
 }
 
-.history-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
+.history-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 
 .history-card-header {
     display: flex;
@@ -1156,12 +979,7 @@ body {
     margin-bottom: 0.75rem;
 }
 
-.history-card-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
+.history-card-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
 .history-card-body {
     display: grid;
@@ -1169,34 +987,12 @@ body {
     gap: 0.75rem;
 }
 
-.history-detail {
-    font-size: 0.9rem;
-}
+.history-detail { font-size: 0.9rem; }
+.history-detail strong { color: #555; display: block; margin-bottom: 0.25rem; font-size: 0.8rem; }
+.history-detail p { margin: 0; color: #666; }
 
-.history-detail strong {
-    color: #555;
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.8rem;
-}
-
-.history-detail p {
-    margin: 0;
-    color: #666;
-}
-
-/* Dental Chart Styles */
-.chart-container {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.dental-chart {
-    max-width: 900px;
-    margin: 0 auto;
-}
+.chart-container { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.dental-chart { max-width: 900px; margin: 0 auto; }
 
 .chart-legend {
     display: flex;
@@ -1209,11 +1005,7 @@ body {
     border-radius: 8px;
 }
 
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
+.legend-item { display: flex; align-items: center; gap: 0.5rem; }
 
 .legend-color {
     width: 24px;
@@ -1222,64 +1014,19 @@ body {
     border: 1px solid #ddd;
 }
 
-.legend-color.healthy {
-    background: #e8f5e9;
-}
+.legend-color.healthy { background: #e8f5e9; }
+.legend-color.cavity { background: #ffebee; }
+.legend-color.filled { background: #e3f2fd; }
+.legend-color.crown { background: #fff9c4; }
+.legend-color.root-canal { background: #f3e5f5; }
+.legend-color.missing { background: #f5f5f5; }
+.legend-color.implant { background: #e0f2f1; }
 
-.legend-color.cavity {
-    background: #ffebee;
-}
-
-.legend-color.filled {
-    background: #e3f2fd;
-}
-
-.legend-color.crown {
-    background: #fff9c4;
-}
-
-.legend-color.root-canal {
-    background: #f3e5f5;
-}
-
-.legend-color.missing {
-    background: #f5f5f5;
-}
-
-.legend-color.implant {
-    background: #e0f2f1;
-}
-
-.chart-grid {
-    display: grid;
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
-
-.jaw-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.jaw-label {
-    text-align: center;
-    font-weight: 600;
-    color: #555;
-    font-size: 1rem;
-}
-
-.quadrant-container {
-    display: flex;
-    gap: 1rem;
-}
-
-.quadrant {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-}
+.chart-grid { display: grid; gap: 2rem; margin-bottom: 2rem; }
+.jaw-section { display: flex; flex-direction: column; gap: 1rem; }
+.jaw-label { text-align: center; font-weight: 600; color: #555; font-size: 1rem; }
+.quadrant-container { display: flex; gap: 1rem; }
+.quadrant { flex: 1; display: flex; justify-content: center; gap: 0.5rem; }
 
 .tooth {
     display: flex;
@@ -1294,92 +1041,24 @@ body {
     min-width: 60px;
 }
 
-.tooth:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border-color: #4CAF50;
-}
+.tooth:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: #4CAF50; }
+.tooth.selected { border-color: #4CAF50; border-width: 3px; background: #e8f5e9; }
+.tooth-number { font-size: 0.75rem; font-weight: 600; color: #666; margin-bottom: 0.25rem; }
+.tooth-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+.tooth-status { font-size: 0.65rem; text-align: center; min-height: 1rem; }
 
-.tooth.selected {
-    border-color: #4CAF50;
-    border-width: 3px;
-    background: #e8f5e9;
-}
+.tooth.healthy { background: #e8f5e9; border-color: #4CAF50; }
+.tooth.cavity { background: #ffebee; border-color: #f44336; }
+.tooth.filled { background: #e3f2fd; border-color: #2196F3; }
+.tooth.crown { background: #fff9c4; border-color: #FFC107; }
+.tooth.root-canal { background: #f3e5f5; border-color: #9c27b0; }
+.tooth.missing { background: #f5f5f5; border-color: #9e9e9e; opacity: 0.5; }
+.tooth.implant { background: #e0f2f1; border-color: #009688; }
 
-.tooth-number {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #666;
-    margin-bottom: 0.25rem;
-}
+.quick-condition-container { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.quick-condition-container label { font-weight: 500; color: #555; }
+.quick-condition-container select { flex: 1; max-width: 300px; }
 
-.tooth-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.25rem;
-}
-
-.tooth-status {
-    font-size: 0.65rem;
-    text-align: center;
-    min-height: 1rem;
-}
-
-/* Tooth condition colors */
-.tooth.healthy {
-    background: #e8f5e9;
-    border-color: #4CAF50;
-}
-
-.tooth.cavity {
-    background: #ffebee;
-    border-color: #f44336;
-}
-
-.tooth.filled {
-    background: #e3f2fd;
-    border-color: #2196F3;
-}
-
-.tooth.crown {
-    background: #fff9c4;
-    border-color: #FFC107;
-}
-
-.tooth.root-canal {
-    background: #f3e5f5;
-    border-color: #9c27b0;
-}
-
-.tooth.missing {
-    background: #f5f5f5;
-    border-color: #9e9e9e;
-    opacity: 0.5;
-}
-
-.tooth.implant {
-    background: #e0f2f1;
-    border-color: #009688;
-}
-
-/* Quick condition select */
-.quick-condition-container {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.quick-condition-container label {
-    font-weight: 500;
-    color: #555;
-}
-
-.quick-condition-container select {
-    flex: 1;
-    max-width: 300px;
-}
-
-/* Selected tooth info panel */
 .selected-tooth-info {
     background: white;
     border: 2px solid #4CAF50;
@@ -1388,35 +1067,11 @@ body {
     margin-bottom: 1.5rem;
 }
 
-.tooth-info-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.tooth-info-header h3 {
-    margin: 0;
-    color: #333;
-}
-
-.tooth-info-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-}
-
-.tooth-info-section h4 {
-    font-size: 0.9rem;
-    color: #666;
-    margin-bottom: 0.75rem;
-}
-
-.tooth-conditions-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
+.tooth-info-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.tooth-info-header h3 { margin: 0; color: #333; }
+.tooth-info-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.tooth-info-section h4 { font-size: 0.9rem; color: #666; margin-bottom: 0.75rem; }
+.tooth-conditions-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .tooth-condition-item {
     display: flex;
@@ -1427,11 +1082,7 @@ body {
     border-radius: 4px;
 }
 
-.tooth-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
+.tooth-history-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
 .history-item {
     padding: 0.75rem;
@@ -1440,48 +1091,16 @@ body {
     border-radius: 4px;
 }
 
-.history-date {
-    font-size: 0.75rem;
-    color: #888;
-    margin-bottom: 0.25rem;
-}
+.history-date { font-size: 0.75rem; color: #888; margin-bottom: 0.25rem; }
+.history-desc { font-size: 0.9rem; color: #333; margin-bottom: 0.25rem; }
+.history-notes { font-size: 0.85rem; color: #666; font-style: italic; }
 
-.history-desc {
-    font-size: 0.9rem;
-    color: #333;
-    margin-bottom: 0.25rem;
-}
+.chart-records-section { background: white; border-radius: 8px; padding: 1.5rem; }
 
-.history-notes {
-    font-size: 0.85rem;
-    color: #666;
-    font-style: italic;
-}
+.chart-filters { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.chart-filters .filter-group { flex: 1; min-width: 200px; }
 
-/* Chart records section */
-.chart-records-section {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-}
-
-.chart-filters {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.chart-filters .filter-group {
-    flex: 1;
-    min-width: 200px;
-}
-
-.records-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+.records-list { display: flex; flex-direction: column; gap: 1rem; }
 
 .record-card {
     background: white;
@@ -1491,28 +1110,11 @@ body {
     transition: box-shadow 0.2s;
 }
 
-.record-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
+.record-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 
-.record-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
-}
-
-.record-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.record-actions {
-    display: flex;
-    gap: 0.5rem;
-}
+.record-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+.record-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.record-actions { display: flex; gap: 0.5rem; }
 
 .record-body {
     display: grid;
@@ -1520,14 +1122,8 @@ body {
     gap: 0.5rem;
 }
 
-.record-detail {
-    font-size: 0.9rem;
-}
-
-.record-detail strong {
-    color: #555;
-    font-size: 0.8rem;
-}
+.record-detail { font-size: 0.9rem; }
+.record-detail strong { color: #555; font-size: 0.8rem; }
 
 .record-notes {
     grid-column: 1 / -1;
@@ -1547,7 +1143,6 @@ body {
     color: #888;
 }
 
-/* Condition badges */
 .condition-badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;
@@ -1556,123 +1151,33 @@ body {
     font-weight: 500;
 }
 
-.condition-badge.condition-healthy {
-    background: #e8f5e9;
-    color: #2e7d32;
-}
-
-.condition-badge.condition-cavity {
-    background: #ffebee;
-    color: #c62828;
-}
-
-.condition-badge.condition-filled {
-    background: #e3f2fd;
-    color: #1565c0;
-}
-
-.condition-badge.condition-crown {
-    background: #fff9c4;
-    color: #f57f17;
-}
-
+.condition-badge.condition-healthy { background: #e8f5e9; color: #2e7d32; }
+.condition-badge.condition-cavity { background: #ffebee; color: #c62828; }
+.condition-badge.condition-filled { background: #e3f2fd; color: #1565c0; }
+.condition-badge.condition-crown { background: #fff9c4; color: #f57f17; }
 .condition-badge.condition-root_canal,
-.condition-badge.condition-root-canal {
-    background: #f3e5f5;
-    color: #6a1b9a;
-}
+.condition-badge.condition-root-canal { background: #f3e5f5; color: #6a1b9a; }
+.condition-badge.condition-missing { background: #f5f5f5; color: #616161; }
+.condition-badge.condition-implant { background: #e0f2f1; color: #00695c; }
+.condition-badge.condition-bridge { background: #fff3e0; color: #e65100; }
+.condition-badge.condition-fractured { background: #fbe9e7; color: #bf360c; }
+.condition-badge.condition-impacted { background: #ede7f6; color: #4527a0; }
+.condition-badge.condition-extracted { background: #eceff1; color: #37474f; }
 
-.condition-badge.condition-missing {
-    background: #f5f5f5;
-    color: #616161;
-}
+.condition-date { font-size: 0.75rem; color: #888; }
 
-.condition-badge.condition-implant {
-    background: #e0f2f1;
-    color: #00695c;
-}
+.badge-mild { background: #e3f2fd; color: #1565c0; }
+.badge-moderate { background: #fff3e0; color: #e65100; }
+.badge-severe { background: #ffebee; color: #c62828; }
+.badge-active { background: #e8f5e9; color: #2e7d32; }
+.badge-inactive { background: #f5f5f5; color: #616161; }
+.badge-resolved { background: #e3f2fd; color: #1565c0; }
+.badge-chronic { background: #fff3e0; color: #e65100; }
+.badge-unverified { background: #fff9c4; color: #f57f17; }
+.badge-verified { background: #e8f5e9; color: #2e7d32; }
+.badge-life-threatening { background: #ffebee; color: #c62828; }
 
-.condition-badge.condition-bridge {
-    background: #fff3e0;
-    color: #e65100;
-}
-
-.condition-badge.condition-fractured {
-    background: #fbe9e7;
-    color: #bf360c;
-}
-
-.condition-badge.condition-impacted {
-    background: #ede7f6;
-    color: #4527a0;
-}
-
-.condition-badge.condition-extracted {
-    background: #eceff1;
-    color: #37474f;
-}
-
-.condition-date {
-    font-size: 0.75rem;
-    color: #888;
-}
-
-/* Severity badges */
-.badge-mild {
-    background: #e3f2fd;
-    color: #1565c0;
-}
-
-.badge-moderate {
-    background: #fff3e0;
-    color: #e65100;
-}
-
-.badge-severe {
-    background: #ffebee;
-    color: #c62828;
-}
-
-/* Status badges */
-.badge-active {
-    background: #e8f5e9;
-    color: #2e7d32;
-}
-
-.badge-inactive {
-    background: #f5f5f5;
-    color: #616161;
-}
-
-.badge-resolved {
-    background: #e3f2fd;
-    color: #1565c0;
-}
-
-.badge-chronic {
-    background: #fff3e0;
-    color: #e65100;
-}
-
-.badge-unverified {
-    background: #fff9c4;
-    color: #f57f17;
-}
-
-.badge-verified {
-    background: #e8f5e9;
-    color: #2e7d32;
-}
-
-.badge-life-threatening {
-    background: #ffebee;
-    color: #c62828;
-}
-
-/* Modal adjustments for Part 4 */
-.modal .form-section {
-    margin-bottom: 1.5rem;
-}
+.modal .form-section { margin-bottom: 1.5rem; }
 
 .form-section h4 {
     font-size: 0.9rem;
@@ -1689,79 +1194,8 @@ body {
     margin-bottom: 1rem;
 }
 
-.form-row.single {
-    grid-template-columns: 1fr;
-}
+.form-row.single { grid-template-columns: 1fr; }
 
-/* Print styles for dental chart */
-@media print {
-    .chart-actions,
-    .record-actions,
-    .note-actions,
-    .history-card-header .btn,
-    .quick-condition-container {
-        display: none !important;
-    }
-    
-    .tooth {
-        page-break-inside: avoid;
-    }
-    
-    .record-card,
-    .note-card,
-    .history-card {
-        page-break-inside: avoid;
-        border: 1px solid #ddd;
-    }
-}
-
-/* Mobile responsive for Part 4 */
-@media (max-width: 768px) {
-    .notes-filters,
-    .chart-filters {
-        flex-direction: column;
-    }
-    
-    .filter-group {
-        min-width: 100%;
-    }
-    
-    .history-tabs {
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-    
-    .tab-btn {
-        padding: 0.5rem 1rem;
-    }
-    
-    .tooth-info-body {
-        grid-template-columns: 1fr;
-    }
-    
-    .quadrant {
-        flex-wrap: wrap;
-        gap: 0.25rem;
-    }
-    
-    .tooth {
-        min-width: 50px;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .history-card-body {
-        grid-template-columns: 1fr;
-    }
-    
-    .record-body {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Quick Link Cards for Patient Records Navigation */
 .quick-link-card {
     display: block;
     padding: 1.5rem;
@@ -1776,22 +1210,106 @@ body {
 .quick-link-card:hover {
     border-color: #4CAF50;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.quick-link-icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
+.quick-link-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.quick-link-title { font-size: 1rem; font-weight: 600; color: #333; margin-bottom: 0.5rem; }
+.quick-link-desc { font-size: 0.85rem; color: #666; }
+
+@media print {
+    .chart-actions,
+    .record-actions,
+    .note-actions,
+    .history-card-header .btn,
+    .quick-condition-container { display: none !important; }
+    .tooth { page-break-inside: avoid; }
+    .record-card,
+    .note-card,
+    .history-card { page-break-inside: avoid; border: 1px solid #ddd; }
 }
 
-.quick-link-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 0.5rem;
+@media (max-width: 768px) {
+    .notes-filters,
+    .chart-filters { flex-direction: column; }
+    .filter-group { min-width: 100%; }
+    .history-tabs { overflow-x: auto; white-space: nowrap; }
+    .tab-btn { padding: 0.5rem 1rem; }
+    .tooth-info-body { grid-template-columns: 1fr; }
+    .quadrant { flex-wrap: wrap; gap: 0.25rem; }
+    .tooth { min-width: 50px; }
+    .form-row { grid-template-columns: 1fr; }
+    .history-card-body { grid-template-columns: 1fr; }
+    .record-body { grid-template-columns: 1fr; }
 }
 
-.quick-link-desc {
-    font-size: 0.85rem;
-    color: #666;
+
+/* ============================================
+   CONTENT AREA ISOLATION
+   Prevents inner page styles from breaking
+   the shell layout when loaded via fetch
+   ============================================ */
+
+/* Hide any rogue full-page layout elements injected by inner pages */
+.content-area .app-container,
+.content-area .app-header,
+.content-area header.app-header,
+.content-area nav.menu-bar,
+.content-area aside.sidebar,
+.content-area .app-body > aside,
+.content-area .sidebar-section {
+    display: none !important;
+}
+
+/* Unwrap inner app-body so content flows naturally */
+.content-area .app-body {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+}
+
+/* Normalize all inner page container wrappers */
+.content-area .patients-container,
+.content-area .users-container,
+.content-area .appointments-container,
+.content-area .clinical-notes-container,
+.content-area .dental-chart-container,
+.content-area .page-content,
+.content-area .main-content-inner {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* Keep inner page h1 headings consistent with shell page-title style */
+.content-area h1 {
+    font-size: 18px;
+    font-weight: bold;
+    color: #003BA5;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #D4D0C8;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+}
+
+/* Normalize inner page primary buttons to match shell style */
+.content-area .btn-primary,
+.content-area button[class*="btn-add"],
+.content-area button[class*="btn-new"] {
+    background: linear-gradient(to bottom, #0054E3 0%, #003BA5 100%);
+    color: white;
+    border: 1px solid #003BA5;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    border-radius: 0;
+}
+
+.content-area .btn-primary:hover,
+.content-area button[class*="btn-add"]:hover,
+.content-area button[class*="btn-new"]:hover {
+    background: linear-gradient(to bottom, #0065FF 0%, #0054E3 100%);
 }
