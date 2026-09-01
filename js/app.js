@@ -26,28 +26,34 @@ async function init() {
         // Step 3: Verify authentication state
         const user = await checkAuth();
         if (!user) return;
-        
+
         // Check Supabase config
         if (!checkSupabaseConfig()) {
             showNotification('Supabase is not configured. Please update configuration.', 'warning');
         }
-        
+
         // Setup header action listeners (Logout)
         setupHeaderActions();
 
         // Load user info
         await loadUserInfo();
-        
+
         // Load dashboard data
         await loadDashboard();
-        
+
         // Setup navigation
         setupNavigation();
-        
+
+        // Listen for in-app navigation events dispatched by child modules
+        window.addEventListener('navigate', (e) => {
+            const { page, id } = e.detail;
+            loadPage(page, id);
+        });
+
         // Setup status bar time
         updateStatusTime();
         setInterval(updateStatusTime, 1000);
-        
+
     } catch (error) {
         console.error('Initialization error:', error);
         showNotification('Error initializing application', 'error');
@@ -69,11 +75,10 @@ function setupHeaderActions() {
 async function loadUserInfo() {
     try {
         const user = await getCurrentUserWithProfile();
-        
+
         if (user) {
             const displayName = user.profile?.full_name || user.email || 'User';
             const role = user.profile?.role || 'staff';
-            
             updateUserDisplay(displayName, role);
             return;
         }
@@ -81,7 +86,7 @@ async function loadUserInfo() {
         console.error('Error loading user info:', error);
     }
 
-    // Use fallback from Entra session
+    // Fallback from Entra session
     const session = getCurrentSession();
     if (session) {
         const displayName = session.full_name ||
@@ -121,39 +126,35 @@ async function loadStatistics() {
         const today = new Date().toISOString().split('T')[0];
         const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-        // Today's appointments
         const { count: todayCount, error: todayError } = await supabase
             .from('appointments')
             .select('*', { count: 'exact', head: true })
             .gte('appointment_date', today)
             .lt('appointment_date', tomorrow);
-        
+
         setElementText('statTodayAppointments', todayError ? '0' : (todayCount || 0));
-        
-        // Total patients
+
         const { count: patientCount, error: patientError } = await supabase
             .from('patients')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
-        
+
         setElementText('statTotalPatients', patientError ? '0' : (patientCount || 0));
-        
-        // Pending appointments
+
         const { count: pendingCount, error: pendingError } = await supabase
             .from('appointments')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'scheduled');
-        
+
         setElementText('statPendingAppointments', pendingError ? '0' : (pendingCount || 0));
-        
-        // Unpaid invoices
+
         const { count: unpaidCount, error: unpaidError } = await supabase
             .from('invoices')
             .select('*', { count: 'exact', head: true })
             .neq('status', 'paid');
-        
+
         setElementText('statUnpaidInvoices', unpaidError ? '0' : (unpaidCount || 0));
-        
+
     } catch (error) {
         console.error('Error loading statistics:', error);
         setElementText('statTodayAppointments', '0');
@@ -163,7 +164,7 @@ async function loadStatistics() {
     }
 }
 
-// Helper safely setting element text
+// Helper: safely set element text
 function setElementText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
@@ -180,14 +181,14 @@ async function loadRecentPatients() {
             .select('*')
             .order('created_at', { ascending: false })
             .limit(5);
-        
+
         if (error) throw error;
-        
+
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No patients registered yet</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = data.map(patient => `
             <tr>
                 <td>${patient.patient_id || '-'}</td>
@@ -197,7 +198,7 @@ async function loadRecentPatients() {
                 <td><span class="status-badge status-${patient.status}">${patient.status}</span></td>
             </tr>
         `).join('');
-        
+
     } catch (error) {
         console.error('Error loading recent patients:', error);
         tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No recent patients</td></tr>';
@@ -211,7 +212,7 @@ async function loadTodaySchedule() {
 
     try {
         const today = new Date().toISOString().split('T')[0];
-        
+
         const { data, error } = await supabase
             .from('appointments')
             .select(`
@@ -220,14 +221,14 @@ async function loadTodaySchedule() {
             `)
             .eq('appointment_date', today)
             .order('appointment_time', { ascending: true });
-        
+
         if (error) throw error;
-        
+
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No appointments scheduled for today</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = data.map(apt => `
             <tr>
                 <td>${formatTime(apt.appointment_time)}</td>
@@ -236,113 +237,132 @@ async function loadTodaySchedule() {
                 <td><span class="status-badge status-${apt.status}">${apt.status}</span></td>
             </tr>
         `).join('');
-        
+
     } catch (error) {
         console.error('Error loading today\'s schedule:', error);
         tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No appointments today</td></tr>';
     }
 }
 
-// Setup navigation
+// Setup sidebar navigation
 function setupNavigation() {
     const sidebarItems = document.querySelectorAll('.sidebar-item');
-    
+
     sidebarItems.forEach(item => {
-        item.addEventListener('click', function() {
+        item.addEventListener('click', function () {
             sidebarItems.forEach(i => i.classList.remove('active'));
             this.classList.add('active');
-            
+
             const page = this.getAttribute('data-page');
             loadPage(page);
         });
     });
 }
 
-// Load page content dynamically from repo files
-async function loadPage(page) {
+// Load page content — accepts optional id for detail pages
+async function loadPage(page, id = null) {
     const contentArea = document.getElementById('contentArea');
     if (!contentArea) return;
-    
-    switch(page) {
+
+    switch (page) {
         case 'dashboard':
             contentArea.innerHTML = dashboardTemplate;
             contentArea.scrollTop = 0;
             await loadDashboard();
             break;
-            
+
         case 'patients':
             await fetchAndRenderPage('patients.html', './patients.js');
             break;
-            
+
+        case 'patient-add':
+            await fetchAndRenderPage('patient-add.html', './patient-form.js');
+            break;
+
+        case 'patient-view':
+            await fetchAndRenderPage(
+                `patient-view.html${id ? '?id=' + id : ''}`,
+                './patient-view.js'
+            );
+            break;
+
+        case 'patient-edit':
+            await fetchAndRenderPage(
+                `patient-edit.html${id ? '?id=' + id : ''}`,
+                './patient-form.js'
+            );
+            break;
+
         case 'appointments':
             await fetchAndRenderPage('appointments.html', './appointments.js');
             break;
-            
+
         case 'dental-records':
             await fetchAndRenderPage('clinical-notes.html', './clinical-notes.js');
             break;
-            
+
         case 'dental-chart':
             await fetchAndRenderPage('dental-chart.html', './dental-chart.js');
             break;
-            
+
         case 'treatments':
             await fetchAndRenderPage('clinical-notes.html', './clinical-notes.js');
             break;
-            
+
         case 'billing':
             contentArea.innerHTML = `
                 <div class="page-title">Billing</div>
                 <div class="panel"><div class="panel-body"><p>Billing and Invoicing dashboard active.</p></div></div>
             `;
             break;
-            
+
         case 'reports':
             contentArea.innerHTML = `
                 <div class="page-title">Reports & Analytics</div>
                 <div class="panel"><div class="panel-body"><p>Reports module active.</p></div></div>
             `;
             break;
-            
+
         case 'users':
             await fetchAndRenderPage('users.html', './users.js');
             break;
-            
+
         case 'settings':
             contentArea.innerHTML = `
                 <div class="page-title">Settings</div>
                 <div class="panel"><div class="panel-body"><p>System Configuration and Settings.</p></div></div>
             `;
             break;
-            
+
         default:
             contentArea.innerHTML = '<div class="page-title">Page Not Found</div>';
     }
 }
 
-// Helper: Fetches HTML template into #contentArea and dynamically executes module JS
+// Fetch an HTML page, strip its shell layout, inject content, then run its module
 async function fetchAndRenderPage(htmlFile, modulePath) {
     const contentArea = document.getElementById('contentArea');
     try {
         const response = await fetch(htmlFile);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+
         const rawHtml = await response.text();
-        
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
-        
-        // Try known container classes, then any *-container, then fall back to body
-        const container = doc.querySelector('.content-area') ||
-                          doc.querySelector('.main-content') ||
-                          doc.querySelector('.users-container') ||
-                          doc.querySelector('.patients-container') ||
-                          doc.querySelector('.appointments-container') ||
-                          doc.querySelector('.clinical-notes-container') ||
-                          doc.querySelector('.dental-chart-container') ||
-                          doc.querySelector('[class$="-container"]') ||
-                          doc.body;
-                          
+
+        // Try known content containers first, then fall back to body
+        const container =
+            doc.querySelector('.content-area') ||
+            doc.querySelector('.main-content') ||
+            doc.querySelector('.users-container') ||
+            doc.querySelector('.patients-container') ||
+            doc.querySelector('.appointments-container') ||
+            doc.querySelector('.clinical-notes-container') ||
+            doc.querySelector('.dental-chart-container') ||
+            doc.querySelector('[class$="-container"]') ||
+            doc.body;
+
         contentArea.innerHTML = container ? container.innerHTML : rawHtml;
         contentArea.scrollTop = 0;
 
@@ -366,23 +386,23 @@ async function fetchAndRenderPage(htmlFile, modulePath) {
     }
 }
 
-// Update status bar time
+// Update status bar clock
 function updateStatusTime() {
     const timeEl = document.getElementById('statusTime');
     if (!timeEl) return;
 
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+    const timeString = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
     });
-    const dateString = now.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+    const dateString = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
     });
-    
+
     timeEl.textContent = `${dateString} ${timeString}`;
 }
 
