@@ -183,11 +183,11 @@ function App() {
         </div>
       </header>
       <div className="menu-bar">
-        <button type="button">File</button>
-        <button type="button">Edit</button>
-        <button type="button">View</button>
-        <button type="button">Tools</button>
-        <button type="button">Help</button>
+        <button type="button" onClick={() => navigate("Patients")}>File</button>
+        <button type="button" onClick={() => setNotice("Select a record to edit")}>Edit</button>
+        <button type="button" onClick={() => navigate("Appointments")}>View</button>
+        <button type="button" onClick={() => navigate("Practice Settings")}>Tools</button>
+        <button type="button" onClick={() => setNotice("Use the sidebar to open a module")}>Help</button>
       </div>
       <div className="toolbar">
         <button
@@ -658,10 +658,14 @@ function Patients({
 
 function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
   const [items, setItems] = useState<Appointment[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   useEffect(() => {
     if (!supabase) return;
+    supabase.from("patients").select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies").eq("is_active", true).order("last_name").then(({ data }) => setPatients(data ?? []));
     supabase
       .from("appointments")
       .select(
@@ -692,6 +696,18 @@ function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
         setLoading(false);
       });
   }, []);
+  async function addAppointment() {
+    if (!supabase || !form.patient_id || !form.appointment_date) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error: insertError } = await supabase.from("appointments").insert({ ...form, duration_minutes: Number(form.duration_minutes), provider_id: auth.user?.id, created_by: auth.user?.id }).select("id, patient_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, outlook_event_id, patients(first_name, last_name), profiles:provider_id(full_name)").single();
+    if (insertError) setMessage(insertError.message);
+    else if (data) {
+      const patient = data.patients as unknown as { first_name: string; last_name: string } | null;
+      const provider = data.profiles as unknown as { full_name: string } | null;
+      setItems((current) => [{ ...data, patient_name: patient ? `${patient.first_name} ${patient.last_name}` : "Unknown patient", provider_name: provider?.full_name ?? "Unassigned" } as Appointment, ...current]);
+      setShowForm(false); setNotice("Appointment saved to Supabase");
+    }
+  }
   async function sync(item: Appointment) {
     try {
       const event = await createCalendarEvent({
@@ -724,7 +740,7 @@ function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
   }
   return (
     <section className="panel">
-      <div className="panel-title">Appointment Calendar</div>
+      <div className="panel-title">Appointment Calendar <button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ New Appointment</button></div>
       {message && <p className="send-error">{message}</p>}
       {loading ? (
         <div className="empty-state">Loading appointments...</div>
@@ -765,6 +781,8 @@ function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
           ))}
         </div>
       )}
+      {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Appointment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><label>Patient<select value={form.patient_id} onChange={(event) => setForm({ ...form, patient_id: event.target.value })}><option value="">Select patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name} ({patient.patient_number})</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
     </section>
   );
 }
