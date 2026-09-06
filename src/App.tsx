@@ -62,6 +62,8 @@ const toothNumbers = [
   45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
 ];
 const queryError = (error: { message: string } | null) => error?.message ?? "";
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
 const roleLabel = (role: string) =>
   role === "admin"
     ? "System Administrator"
@@ -383,7 +385,7 @@ function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
           className="action-row"
           onClick={() => navigate("Billing")}
         >
-          <span>$</span>
+              <span>₱</span>
           <strong>Open billing</strong>
           <small>Review outstanding invoices</small>
         </button>
@@ -1062,7 +1064,7 @@ function Treatments({ patient }: { patient: Patient | null }) {
                 </td>
                 <td>{item.procedure_name}</td>
                 <td>{item.tooth_number ?? "-"}</td>
-                <td>${Number(item.cost).toFixed(2)}</td>
+                <td>{formatCurrency(Number(item.cost))}</td>
                 <td>
                   <span className="status-badge">{item.status}</span>
                 </td>
@@ -1134,8 +1136,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       await sendInvoiceEmail({
         invoiceNumber: emailInvoice.invoice_number,
         patientName: emailInvoice.patient,
-        total: `$${Number(emailInvoice.total).toFixed(2)}`,
-        balance: `$${Number(emailInvoice.balance).toFixed(2)}`,
+        total: formatCurrency(Number(emailInvoice.total)),
+        balance: formatCurrency(Number(emailInvoice.balance)),
         invoiceDate: emailInvoice.invoice_date,
         recipient,
       });
@@ -1177,8 +1179,8 @@ function Billing({ patient }: { patient: Patient | null }) {
                 <td>{item.invoice_number}</td>
                 <td>{item.patient}</td>
                 <td>{item.invoice_date}</td>
-                <td>${Number(item.total).toFixed(2)}</td>
-                <td>${Number(item.balance).toFixed(2)}</td>
+                <td>{formatCurrency(Number(item.total))}</td>
+                <td>{formatCurrency(Number(item.balance))}</td>
                 <td>
                   <span className="status-badge">{item.status}</span>
                 </td>
@@ -1296,7 +1298,7 @@ function Reports() {
       <section className="panel report-card">
         <div className="panel-title">Collections</div>
         <strong className="report-number">
-          ${counts.collections.toFixed(2)}
+          {formatCurrency(counts.collections)}
         </strong>
         <span>payments recorded</span>
       </section>
