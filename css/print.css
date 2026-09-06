@@ -1,0 +1,123 @@
+/* Print Styles for Dental Management System */
+
+@media print {
+    /* Hide UI elements */
+    .app-header,
+    .menu-bar,
+    .sidebar,
+    .status-bar,
+    .toolbar,
+    .btn,
+    .action-btn,
+    .form-actions,
+    .pagination-controls,
+    .notification {
+        display: none !important;
+    }
+    
+    /* Reset page layout */
+    body {
+        background: white;
+        font-size: 11pt;
+    }
+    
+    .app-container {
+        height: auto;
+    }
+    
+    .main-content {
+        display: block;
+    }
+    
+    .content-area {
+        padding: 0;
+        overflow: visible;
+    }
+    
+    /* Page breaks */
+    .page-break {
+        page-break-after: always;
+    }
+    
+    .no-break {
+        page-break-inside: avoid;
+    }
+    
+    /* Tables */
+    .data-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 9pt;
+    }
+    
+    .data-table th {
+        background: #E0E0E0 !important;
+        border: 1px solid #000;
+        padding: 4px;
+    }
+    
+    .data-table td {
+        border: 1px solid #000;
+        padding: 3px;
+    }
+    
+    .data-table tbody tr:nth-child(even) {
+        background: #F5F5F5 !important;
+    }
+    
+    /* Print header */
+    .print-header {
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+    }
+    
+    .print-title {
+        font-size: 16pt;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .print-subtitle {
+        font-size: 11pt;
+        color: #666;
+    }
+    
+    /* Print footer */
+    .print-footer {
+        margin-top: 20px;
+        border-top: 1px solid #000;
+        padding-top: 10px;
+        font-size: 9pt;
+        text-align: center;
+    }
+    
+    /* Invoice specific */
+    .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    
+    .invoice-total {
+        font-size: 14pt;
+        font-weight: bold;
+        text-align: right;
+        margin-top: 10px;
+    }
+    
+    /* Forms */
+    .form-input,
+    .form-select,
+    .form-textarea {
+        border: none;
+        border-bottom: 1px solid #000;
+        background: none;
+    }
+    
+    /* Links */
+    a {
+        text-decoration: none;
+        color: #000;
+    }
+}

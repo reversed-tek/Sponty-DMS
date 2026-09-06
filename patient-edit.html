@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Patient - Dental Practice Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/tables.css">
+    <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-title">🦷 Dental Practice Management</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-info" class="user-info">Loading...</span>
+                <button id="logout-btn" class="btn btn-small">Logout</button>
+            </div>
+        </header>
+
+        <!-- Menu Bar -->
+        <nav class="menu-bar">
+            <a href="index.html" class="menu-item">Dashboard</a>
+            <a href="patients.html" class="menu-item active">Patients</a>
+            <a href="#" class="menu-item">Appointments</a>
+            <a href="#" class="menu-item">Treatments</a>
+            <a href="#" class="menu-item">Billing</a>
+            <a href="#" class="menu-item">Reports</a>
+        </nav>
+
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Dashboard</h3>
+                    <a href="index.html">Overview</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Patients</h3>
+                    <a href="patients.html">All Patients</a>
+                    <a href="patient-add.html">Add New Patient</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Schedule</h3>
+                    <a href="#">Appointments</a>
+                    <a href="#">Calendar</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Clinical</h3>
+                    <a href="#">Treatments</a>
+                    <a href="#">Procedures</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Financial</h3>
+                    <a href="#">Invoices</a>
+                    <a href="#">Payments</a>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Reports</h3>
+                    <a href="#">Statistics</a>
+                    <a href="#">Export Data</a>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="content">
+                <div class="content-header">
+                    <h2>Edit Patient</h2>
+                    <div class="content-actions">
+                        <button id="view-patient-btn" class="btn btn-secondary">View Details</button>
+                        <a href="patients.html" class="btn btn-secondary">← Back to Patients</a>
+                    </div>
+                </div>
+
+                <div id="loading-indicator" style="text-align: center; padding: 40px;">
+                    Loading patient data...
+                </div>
+
+                <form id="patient-form" style="display: none;">
+                    <input type="hidden" id="patient_id" name="patient_id">
+                    
+                    <!-- Patient Number Display -->
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Patient Number</label>
+                                    <input type="text" id="patient_number" readonly disabled>
+                                </div>
+                                <div class="form-group">
+                                    <label for="is_active">Status</label>
+                                    <select id="is_active" name="is_active">
+                                        <option value="true">Active</option>
+                                        <option value="false">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Information -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Personal Information</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="first_name">First Name <span class="required">*</span></label>
+                                    <input type="text" id="first_name" name="first_name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="last_name">Last Name <span class="required">*</span></label>
+                                    <input type="text" id="last_name" name="last_name" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="date_of_birth">Date of Birth <span class="required">*</span></label>
+                                    <input type="date" id="date_of_birth" name="date_of_birth" required>
+                                    <small class="help-text" id="age-display"></small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="gender">Gender</label>
+                                    <select id="gender" name="gender">
+                                        <option value="">Select...</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                        <option value="prefer_not_to_say">Prefer not to say</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Contact Information</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="email">Email</label>
+                                    <input type="email" id="email" name="email">
+                                </div>
+                                <div class="form-group">
+                                    <label for="phone">Phone <span class="required">*</span></label>
+                                    <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="mobile">Mobile</label>
+                                    <input type="tel" id="mobile" name="mobile" placeholder="(555) 123-4567">
+                                </div>
+                                <div class="form-group">
+                                    <!-- Spacer -->
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="address">Address</label>
+                                <input type="text" id="address" name="address" placeholder="Street address">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="city">City</label>
+                                    <input type="text" id="city" name="city">
+                                </div>
+                                <div class="form-group">
+                                    <label for="state">State</label>
+                                    <input type="text" id="state" name="state" maxlength="2" placeholder="IL">
+                                </div>
+                                <div class="form-group">
+                                    <label for="zip">ZIP Code</label>
+                                    <input type="text" id="zip" name="zip" maxlength="10" placeholder="62701">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Emergency Contact -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Emergency Contact</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="emergency_contact_name">Contact Name</label>
+                                    <input type="text" id="emergency_contact_name" name="emergency_contact_name">
+                                </div>
+                                <div class="form-group">
+                                    <label for="emergency_contact_phone">Contact Phone</label>
+                                    <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone" placeholder="(555) 123-4567">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Insurance Information -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Insurance Information</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="insurance_provider">Insurance Provider</label>
+                                    <input type="text" id="insurance_provider" name="insurance_provider" placeholder="e.g., Blue Cross">
+                                </div>
+                                <div class="form-group">
+                                    <label for="insurance_policy_number">Policy Number</label>
+                                    <input type="text" id="insurance_policy_number" name="insurance_policy_number">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medical Information -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Medical Information</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-group">
+                                <label for="allergies">Allergies</label>
+                                <textarea id="allergies" name="allergies" rows="3" placeholder="List any known allergies (medications, latex, etc.)"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="medical_notes">Medical Notes</label>
+                                <textarea id="medical_notes" name="medical_notes" rows="4" placeholder="Any medical conditions, medications, or important health information"></textarea>
+                                <small class="help-text">Include chronic conditions, current medications, and relevant medical history</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Record Info -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Record Information</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Created</label>
+                                    <input type="text" id="created_at" readonly disabled>
+                                </div>
+                                <div class="form-group">
+                                    <label>Last Updated</label>
+                                    <input type="text" id="updated_at" readonly disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="form-actions">
+                        <button type="submit" id="submit-btn" class="btn btn-primary">
+                            <span id="submit-text">Save Changes</span>
+                            <span id="submit-loading" style="display: none;">Saving...</span>
+                        </button>
+                        <button type="button" id="view-patient-btn-bottom" class="btn btn-secondary">View Details</button>
+                        <a href="patients.html" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </main>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <span id="status-message">Loading patient...</span>
+            <span id="status-clock"></span>
+        </footer>
+    </div>
+
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/ui.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/patient-form.js"></script>
+</body>
+</html>
