@@ -1,60 +1,1552 @@
-import { useEffect, useMemo, useState } from 'react'
-import './App.css'
-import { signInWithMicrosoft, signOut, supabase } from './lib/supabase'
-import { createCalendarEvent, sendInvoiceEmail } from './lib/outlook'
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+import { signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
+import { createCalendarEvent, sendInvoiceEmail } from "./lib/outlook";
 
-type Page = 'Dashboard' | 'Patients' | 'Appointments' | 'Clinical Records' | 'Dental Chart' | 'Treatments' | 'Billing' | 'Reports' | 'User Management' | 'Practice Settings'
-type Patient = { id: string; patient_number: string; first_name: string; last_name: string; date_of_birth: string; phone: string | null; email: string | null; is_active: boolean; allergies: string | null }
-type Profile = { id: string; full_name: string; email: string; role: string; is_active: boolean; last_login_at: string | null }
-type Appointment = { id: string; patient_id: string; patient_name: string; provider_name: string; appointment_date: string; appointment_time: string; duration_minutes: number; appointment_type: string; status: string; reason: string | null; outlook_event_id: string | null }
+type Page =
+  | "Dashboard"
+  | "Patients"
+  | "Appointments"
+  | "Clinical Records"
+  | "Dental Chart"
+  | "Treatments"
+  | "Billing"
+  | "Reports"
+  | "User Management"
+  | "Practice Settings";
+type Patient = {
+  id: string;
+  patient_number: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  phone: string | null;
+  email: string | null;
+  is_active: boolean;
+  allergies: string | null;
+};
+type Profile = {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  last_login_at: string | null;
+};
+type Appointment = {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  provider_name: string;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  appointment_type: string;
+  status: string;
+  reason: string | null;
+  outlook_event_id: string | null;
+};
 
-const navItems: Page[] = ['Dashboard', 'Patients', 'Appointments', 'Clinical Records', 'Dental Chart', 'Treatments', 'Billing', 'Reports']
-const toothNumbers = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28, 48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
-const queryError = (error: { message: string } | null) => error?.message ?? ''
+const navItems: Page[] = [
+  "Dashboard",
+  "Patients",
+  "Appointments",
+  "Clinical Records",
+  "Dental Chart",
+  "Treatments",
+  "Billing",
+  "Reports",
+];
+const toothNumbers = [
+  18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28, 48, 47, 46,
+  45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
+];
+const queryError = (error: { message: string } | null) => error?.message ?? "";
+const roleLabel = (role: string) =>
+  role === "admin"
+    ? "System Administrator"
+    : role === "dentist"
+      ? "Dentist"
+      : "Receptionist";
 
 function App() {
-  const [page, setPage] = useState<Page>('Dashboard')
-  const [sessionUser, setSessionUser] = useState<{ id: string; email?: string } | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [profileError, setProfileError] = useState('')
-  const [authLoading, setAuthLoading] = useState(true)
-  const [notice, setNotice] = useState('Ready')
-  const [search, setSearch] = useState('')
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [page, setPage] = useState<Page>("Dashboard");
+  const [sessionUser, setSessionUser] = useState<{
+    id: string;
+    email?: string;
+  } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
+  const [notice, setNotice] = useState("Ready");
+  const [search, setSearch] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
-    if (!supabase) { setAuthLoading(false); return }
-    supabase.auth.getSession().then(({ data }) => { setSessionUser(data.session?.user ?? null); setAuthLoading(false) })
-    const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => setSessionUser(currentSession?.user ?? null))
-    return () => data.subscription.unsubscribe()
-  }, [])
-  useEffect(() => { if (!supabase || !sessionUser) { setProfile(null); setProfileError(''); return } supabase.from('profiles').select('id, full_name, email, role, is_active, last_login_at').eq('id', sessionUser.id).single().then(({ data, error }) => { setProfile(data); setProfileError(error?.message ?? '') }) }, [sessionUser])
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, currentSession) =>
+      setSessionUser(currentSession?.user ?? null),
+    );
+    return () => data.subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (!supabase || !sessionUser) {
+      setProfile(null);
+      setProfileError("");
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, role, is_active, last_login_at")
+      .eq("id", sessionUser.id)
+      .single()
+      .then(({ data, error }) => {
+        setProfile(data);
+        setProfileError(error?.message ?? "");
+      });
+  }, [sessionUser]);
 
-  if (authLoading) return <div className="auth-screen">Loading session...</div>
-  if (!sessionUser || !profile?.is_active) return <div className="auth-screen"><section className="classic-dialog login-dialog"><div className="dialog-title">Dental Office Manager</div><div className="dialog-body"><h1>{sessionUser ? 'Account setup required' : 'Sign in required'}</h1><p className="dialog-intro">{sessionUser ? 'Microsoft sign-in succeeded, but this account is not linked to an active public.profiles record.' : 'Sign in with your Microsoft practice account to access patient and practice records.'}</p>{sessionUser && <p className="send-error">{profileError || 'Create a profile row using this Auth user ID before signing in again.'}<br />Auth user: {sessionUser.id}</p>} {!sessionUser && <button type="button" className="classic-button primary" onClick={() => signInWithMicrosoft().catch((error) => setNotice(error.message))}>Sign in with Microsoft</button>}<button type="button" className="classic-button" onClick={() => signOut()}>Sign out</button><p className="send-error">{notice}</p></div></section></div>
+  if (authLoading) return <div className="auth-screen">Loading session...</div>;
+  if (!sessionUser || !profile?.is_active)
+    return (
+      <div className="auth-screen">
+        <section className="classic-dialog login-dialog">
+          <div className="dialog-title">Dental Office Manager</div>
+          <div className="dialog-body">
+            <h1>
+              {sessionUser ? "Account setup required" : "Sign in required"}
+            </h1>
+            <p className="dialog-intro">
+              {sessionUser
+                ? "Microsoft sign-in succeeded, but this account is not linked to an active public.profiles record."
+                : "Sign in with your Microsoft practice account to access patient and practice records."}
+            </p>
+            {sessionUser && (
+              <p className="send-error">
+                {profileError ||
+                  "Create a profile row using this Auth user ID before signing in again."}
+                <br />
+                Auth user: {sessionUser.id}
+              </p>
+            )}{" "}
+            {!sessionUser && (
+              <button
+                type="button"
+                className="classic-button primary"
+                onClick={() =>
+                  signInWithMicrosoft().catch((error) =>
+                    setNotice(error.message),
+                  )
+                }
+              >
+                Sign in with Microsoft
+              </button>
+            )}
+            <button
+              type="button"
+              className="classic-button"
+              onClick={() => signOut()}
+            >
+              Sign out
+            </button>
+            <p className="send-error">{notice}</p>
+          </div>
+        </section>
+      </div>
+    );
 
-  const navigate = (next: Page) => { setPage(next); setNotice(`${next} selected`) }
-  return <div className="app-window"><header className="title-bar"><div className="title-bar-text"><span className="app-mark">+</span> Dental Office Manager</div><div className="window-controls"><button type="button">_</button><button type="button">[]</button><button type="button" onClick={() => signOut()}>X</button></div></header><div className="menu-bar"><button type="button">File</button><button type="button">Edit</button><button type="button">View</button><button type="button">Tools</button><button type="button">Help</button></div><div className="toolbar"><button type="button" className="toolbar-button" onClick={() => navigate('Patients')}>Patients</button><button type="button" className="toolbar-button" onClick={() => navigate('Appointments')}>[ ] Schedule</button><span className="toolbar-divider" /><label className="quick-search">Quick Find: <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="patient name or number" /></label><span className="signed-in">{profile.full_name}</span></div><div className="workspace"><aside className="sidebar"><div className="sidebar-heading">Practice Menu</div><nav>{navItems.map((item) => <button type="button" key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item)}><span className="nav-icon">{item[0]}</span>{item}</button>)}</nav><div className="sidebar-section">Administration</div><button type="button" className={page === 'User Management' ? 'nav-item active' : 'nav-item'} onClick={() => navigate('User Management')}><span className="nav-icon">U</span>Users</button><button type="button" className={page === 'Practice Settings' ? 'nav-item active' : 'nav-item'} onClick={() => navigate('Practice Settings')}><span className="nav-icon">S</span>Settings</button><div className="sidebar-note"><strong>Signed in as</strong><br />{profile.full_name}<br /><span>{profile.role}</span></div></aside><main className="main-panel"><div className="page-heading"><div><div className="breadcrumbs">Practice / {page}</div><h1>{page}</h1></div><button type="button" className="classic-button" onClick={() => window.print()}>Print</button></div>{page === 'Dashboard' && <Dashboard navigate={navigate} />}{page === 'Patients' && <Patients search={search} selected={selectedPatient} setSelected={setSelectedPatient} setNotice={setNotice} />}{page === 'Appointments' && <Appointments setNotice={setNotice} />}{page === 'Clinical Records' && <ClinicalRecords selected={selectedPatient} />}{page === 'Dental Chart' && <DentalChart patient={selectedPatient} setNotice={setNotice} />}{page === 'Treatments' && <Treatments />}{page === 'Billing' && <Billing />}{page === 'Reports' && <Reports />}{page === 'User Management' && <UserManagement />}{page === 'Practice Settings' && <PracticeSettings />}</main></div><footer className="status-bar"><span className="status-panel">{notice}</span><span className="status-panel status-right">{profile.role} | Database connected</span></footer></div>
+  const navigate = (next: Page) => {
+    setPage(next);
+    setNotice(`${next} selected`);
+  };
+  return (
+    <div className="app-window">
+      <header className="title-bar">
+        <div className="title-bar-text">
+          <span className="app-mark">+</span> Dental Office Manager
+        </div>
+        <div className="window-controls">
+          <button type="button">_</button>
+          <button type="button">[]</button>
+          <button type="button" onClick={() => signOut()}>
+            X
+          </button>
+        </div>
+      </header>
+      <div className="menu-bar">
+        <button type="button">File</button>
+        <button type="button">Edit</button>
+        <button type="button">View</button>
+        <button type="button">Tools</button>
+        <button type="button">Help</button>
+      </div>
+      <div className="toolbar">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => navigate("Patients")}
+        >
+          Patients
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => navigate("Appointments")}
+        >
+          [ ] Schedule
+        </button>
+        <span className="toolbar-divider" />
+        <label className="quick-search">
+          Quick Find:{" "}
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="patient name or number"
+          />
+        </label>
+        <span className="signed-in">{profile.full_name}</span>
+      </div>
+      <div className="workspace">
+        <aside className="sidebar">
+          <div className="sidebar-heading">Practice Menu</div>
+          <nav>
+            {navItems.map((item) => (
+              <button
+                type="button"
+                key={item}
+                className={page === item ? "nav-item active" : "nav-item"}
+                onClick={() => navigate(item)}
+              >
+                <span className="nav-icon">{item[0]}</span>
+                {item}
+              </button>
+            ))}
+          </nav>
+          <div className="sidebar-section">Administration</div>
+          <button
+            type="button"
+            className={
+              page === "User Management" ? "nav-item active" : "nav-item"
+            }
+            onClick={() => navigate("User Management")}
+          >
+            <span className="nav-icon">U</span>Users
+          </button>
+          <button
+            type="button"
+            className={
+              page === "Practice Settings" ? "nav-item active" : "nav-item"
+            }
+            onClick={() => navigate("Practice Settings")}
+          >
+            <span className="nav-icon">S</span>Settings
+          </button>
+          <div className="sidebar-note">
+            <strong>Signed in as</strong>
+            <br />
+            {profile.full_name}
+            <br />
+            <span>{roleLabel(profile.role)}</span>
+          </div>
+        </aside>
+        <main className="main-panel">
+          <div className="page-heading">
+            <div>
+              <div className="breadcrumbs">Practice / {page}</div>
+              <h1>{page}</h1>
+            </div>
+            <button
+              type="button"
+              className="classic-button"
+              onClick={() => window.print()}
+            >
+              Print
+            </button>
+          </div>
+          {page === "Dashboard" && <Dashboard navigate={navigate} />}
+          {page === "Patients" && (
+            <Patients
+              search={search}
+              selected={selectedPatient}
+              setSelected={setSelectedPatient}
+              setNotice={setNotice}
+            />
+          )}
+          {page === "Appointments" && <Appointments setNotice={setNotice} />}
+          {page === "Clinical Records" && (
+            <ClinicalRecords selected={selectedPatient} />
+          )}
+          {page === "Dental Chart" && (
+            <DentalChart patient={selectedPatient} setNotice={setNotice} />
+          )}
+          {page === "Treatments" && <Treatments patient={selectedPatient} />}
+          {page === "Billing" && <Billing patient={selectedPatient} />}
+          {page === "Reports" && <Reports />}
+          {page === "User Management" && <UserManagement />}
+          {page === "Practice Settings" && <PracticeSettings />}
+        </main>
+      </div>
+      <footer className="status-bar">
+        <span className="status-panel">{notice}</span>
+        <span className="status-panel status-right">
+          {roleLabel(profile.role)} | Database connected
+        </span>
+      </footer>
+    </div>
+  );
 }
 
-function Dashboard({ navigate }: { navigate: (page: Page) => void }) { const [counts, setCounts] = useState({ patients: 0, appointments: 0, invoices: 0 }); useEffect(() => { if (!supabase) return; Promise.all([supabase.from('patients').select('id', { count: 'exact', head: true }).eq('is_active', true), supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('appointment_date', new Date().toISOString().slice(0, 10)), supabase.from('invoices').select('id', { count: 'exact', head: true }).gt('balance', 0)]).then(([patients, appointments, invoices]) => setCounts({ patients: patients.count ?? 0, appointments: appointments.count ?? 0, invoices: invoices.count ?? 0 })) }, []); return <div className="dashboard-grid"><section className="panel stat-panel"><div className="panel-title">Today's Overview</div><div className="stat-row"><div><b>{counts.appointments}</b><span>Appointments today</span></div><div><b>{counts.patients}</b><span>Active patients</span></div><div><b>{counts.invoices}</b><span>Outstanding invoices</span></div></div></section><section className="panel alert-panel"><div className="panel-title">Database Status</div><p className="notice info">Live counts are loaded from Supabase.</p><p className="notice warning">Review active patient alerts before treatment.</p></section><section className="panel quick-panel"><div className="panel-title">Quick Actions</div><button type="button" className="action-row" onClick={() => navigate('Patients')}><span>P</span><strong>Open patients</strong><small>Search the live patient register</small></button><button type="button" className="action-row" onClick={() => navigate('Appointments')}><span>A</span><strong>Open appointments</strong><small>Review the live schedule</small></button><button type="button" className="action-row" onClick={() => navigate('Billing')}><span>$</span><strong>Open billing</strong><small>Review outstanding invoices</small></button></section></div> }
+function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
+  const [counts, setCounts] = useState({
+    patients: 0,
+    appointments: 0,
+    invoices: 0,
+  });
+  useEffect(() => {
+    if (!supabase) return;
+    Promise.all([
+      supabase
+        .from("patients")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true),
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("appointment_date", new Date().toISOString().slice(0, 10)),
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .gt("balance", 0),
+    ]).then(([patients, appointments, invoices]) =>
+      setCounts({
+        patients: patients.count ?? 0,
+        appointments: appointments.count ?? 0,
+        invoices: invoices.count ?? 0,
+      }),
+    );
+  }, []);
+  return (
+    <div className="dashboard-grid">
+      <section className="panel stat-panel">
+        <div className="panel-title">Today's Overview</div>
+        <div className="stat-row">
+          <div>
+            <b>{counts.appointments}</b>
+            <span>Appointments today</span>
+          </div>
+          <div>
+            <b>{counts.patients}</b>
+            <span>Active patients</span>
+          </div>
+          <div>
+            <b>{counts.invoices}</b>
+            <span>Outstanding invoices</span>
+          </div>
+        </div>
+      </section>
+      <section className="panel alert-panel">
+        <div className="panel-title">Database Status</div>
+        <p className="notice info">Live counts are loaded from Supabase.</p>
+        <p className="notice warning">
+          Review active patient alerts before treatment.
+        </p>
+      </section>
+      <section className="panel quick-panel">
+        <div className="panel-title">Quick Actions</div>
+        <button
+          type="button"
+          className="action-row"
+          onClick={() => navigate("Patients")}
+        >
+          <span>P</span>
+          <strong>Open patients</strong>
+          <small>Search the live patient register</small>
+        </button>
+        <button
+          type="button"
+          className="action-row"
+          onClick={() => navigate("Appointments")}
+        >
+          <span>A</span>
+          <strong>Open appointments</strong>
+          <small>Review the live schedule</small>
+        </button>
+        <button
+          type="button"
+          className="action-row"
+          onClick={() => navigate("Billing")}
+        >
+          <span>$</span>
+          <strong>Open billing</strong>
+          <small>Review outstanding invoices</small>
+        </button>
+      </section>
+    </div>
+  );
+}
 
-function Patients({ search, selected, setSelected, setNotice }: { search: string; selected: Patient | null; setSelected: (patient: Patient | null) => void; setNotice: (message: string) => void }) { const [patients, setPatients] = useState<Patient[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [showAdd, setShowAdd] = useState(false); const [form, setForm] = useState({ first_name: '', last_name: '', date_of_birth: '', phone: '', email: '' }); useEffect(() => { if (!supabase) return; supabase.from('patients').select('id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies').order('last_name').then(({ data, error: fetchError }) => { setPatients(data ?? []); setError(queryError(fetchError)); setLoading(false) }) }, []); const filtered = useMemo(() => patients.filter((patient) => `${patient.first_name} ${patient.last_name} ${patient.patient_number} ${patient.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())), [patients, search]); async function addPatient() { if (!supabase) return; const { data: user } = await supabase.auth.getUser(); const { data, error: insertError } = await supabase.from('patients').insert({ ...form, patient_number: `P-${Date.now().toString().slice(-6)}`, created_by: user.user?.id }).select().single(); if (insertError) setError(insertError.message); else if (data) { setPatients((current) => [data, ...current]); setSelected(data); setShowAdd(false); setForm({ first_name: '', last_name: '', date_of_birth: '', phone: '', email: '' }); setNotice('Patient saved to Supabase') } } return <div className="content-stack"><section className="panel"><div className="panel-title">Patient Register <button type="button" className="classic-button primary" onClick={() => setShowAdd(true)}>+ New Patient</button></div><div className="filter-row"><label>Search <input value={search} readOnly placeholder="Use Quick Find above" /></label><button type="button" className="classic-button" onClick={() => window.print()}>Print</button></div>{error && <p className="send-error">{error}</p>}{loading ? <div className="empty-state">Loading patient records...</div> : <div className="table-wrap"><table><thead><tr><th>Patient No.</th><th>Name</th><th>Date of birth</th><th>Phone</th><th>Status</th><th>Alerts</th></tr></thead><tbody>{filtered.map((patient) => <tr key={patient.id} className={selected?.id === patient.id ? 'selected-row' : ''} onClick={() => setSelected(patient)}><td>{patient.patient_number}</td><td><strong>{patient.first_name} {patient.last_name}</strong></td><td>{patient.date_of_birth}</td><td>{patient.phone ?? '-'}</td><td><span className={`status-badge ${patient.is_active ? 'active' : 'inactive'}`}>{patient.is_active ? 'Active' : 'Inactive'}</span></td><td>{patient.allergies ?? '-'}</td></tr>)}</tbody></table>{!filtered.length && <div className="empty-state">No patient records found.</div>}</div>}</section>{selected && <section className="panel patient-summary"><div className="panel-title">Patient Summary <span>Record {selected.patient_number}</span></div><div className="patient-grid"><div><span>Full name</span><strong className="patient-name">{selected.first_name} {selected.last_name}</strong></div><div><span>Date of birth</span><strong>{selected.date_of_birth}</strong></div><div><span>Telephone</span><strong>{selected.phone ?? '-'}</strong></div><div><span>Status</span><span className="status-badge active">{selected.is_active ? 'Active' : 'Inactive'}</span></div></div></section>}{showAdd && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Patient <button type="button" onClick={() => setShowAdd(false)}>X</button></div><div className="dialog-body"><label>First name<input value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></label><label>Last name<input value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></label><label>Date of birth<input type="date" value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event.target.value })} /></label><label>Phone<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label><label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowAdd(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.first_name || !form.last_name || !form.date_of_birth} onClick={addPatient}>Save Patient</button></div></div></section></div>}</div> }
+function Patients({
+  search,
+  selected,
+  setSelected,
+  setNotice,
+}: {
+  search: string;
+  selected: Patient | null;
+  setSelected: (patient: Patient | null) => void;
+  setNotice: (message: string) => void;
+}) {
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({
+    first_name: "",
+    last_name: "",
+    date_of_birth: "",
+    phone: "",
+    email: "",
+  });
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("patients")
+      .select(
+        "id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies",
+      )
+      .order("last_name")
+      .then(({ data, error: fetchError }) => {
+        setPatients(data ?? []);
+        setError(queryError(fetchError));
+        setLoading(false);
+      });
+  }, []);
+  const filtered = useMemo(
+    () =>
+      patients.filter((patient) =>
+        `${patient.first_name} ${patient.last_name} ${patient.patient_number} ${patient.phone ?? ""}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      ),
+    [patients, search],
+  );
+  async function addPatient() {
+    if (!supabase) return;
+    const { data: user } = await supabase.auth.getUser();
+    const { data, error: insertError } = await supabase
+      .from("patients")
+      .insert({
+        ...form,
+        patient_number: `P-${Date.now().toString().slice(-6)}`,
+        created_by: user.user?.id,
+      })
+      .select()
+      .single();
+    if (insertError) setError(insertError.message);
+    else if (data) {
+      setPatients((current) => [data, ...current]);
+      setSelected(data);
+      setShowAdd(false);
+      setForm({
+        first_name: "",
+        last_name: "",
+        date_of_birth: "",
+        phone: "",
+        email: "",
+      });
+      setNotice("Patient saved to Supabase");
+    }
+  }
+  return (
+    <div className="content-stack">
+      <section className="panel">
+        <div className="panel-title">
+          Patient Register{" "}
+          <button
+            type="button"
+            className="classic-button primary"
+            onClick={() => setShowAdd(true)}
+          >
+            + New Patient
+          </button>
+        </div>
+        <div className="filter-row">
+          <label>
+            Search{" "}
+            <input value={search} readOnly placeholder="Use Quick Find above" />
+          </label>
+          <button
+            type="button"
+            className="classic-button"
+            onClick={() => window.print()}
+          >
+            Print
+          </button>
+        </div>
+        {error && <p className="send-error">{error}</p>}
+        {loading ? (
+          <div className="empty-state">Loading patient records...</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient No.</th>
+                  <th>Name</th>
+                  <th>Date of birth</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Alerts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((patient) => (
+                  <tr
+                    key={patient.id}
+                    className={
+                      selected?.id === patient.id ? "selected-row" : ""
+                    }
+                    onClick={() => setSelected(patient)}
+                  >
+                    <td>{patient.patient_number}</td>
+                    <td>
+                      <strong>
+                        {patient.first_name} {patient.last_name}
+                      </strong>
+                    </td>
+                    <td>{patient.date_of_birth}</td>
+                    <td>{patient.phone ?? "-"}</td>
+                    <td>
+                      <span
+                        className={`status-badge ${patient.is_active ? "active" : "inactive"}`}
+                      >
+                        {patient.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td>{patient.allergies ?? "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filtered.length && (
+              <div className="empty-state">No patient records found.</div>
+            )}
+          </div>
+        )}
+      </section>
+      {selected && (
+        <section className="panel patient-summary">
+          <div className="panel-title">
+            Patient Summary <span>Record {selected.patient_number}</span>
+          </div>
+          <div className="patient-grid">
+            <div>
+              <span>Full name</span>
+              <strong className="patient-name">
+                {selected.first_name} {selected.last_name}
+              </strong>
+            </div>
+            <div>
+              <span>Date of birth</span>
+              <strong>{selected.date_of_birth}</strong>
+            </div>
+            <div>
+              <span>Telephone</span>
+              <strong>{selected.phone ?? "-"}</strong>
+            </div>
+            <div>
+              <span>Status</span>
+              <span className="status-badge active">
+                {selected.is_active ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+      {showAdd && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              New Patient{" "}
+              <button type="button" onClick={() => setShowAdd(false)}>
+                X
+              </button>
+            </div>
+            <div className="dialog-body">
+              <label>
+                First name
+                <input
+                  value={form.first_name}
+                  onChange={(event) =>
+                    setForm({ ...form, first_name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Last name
+                <input
+                  value={form.last_name}
+                  onChange={(event) =>
+                    setForm({ ...form, last_name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Date of birth
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={(event) =>
+                    setForm({ ...form, date_of_birth: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  value={form.phone}
+                  onChange={(event) =>
+                    setForm({ ...form, phone: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) =>
+                    setForm({ ...form, email: event.target.value })
+                  }
+                />
+              </label>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => setShowAdd(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={
+                    !form.first_name || !form.last_name || !form.date_of_birth
+                  }
+                  onClick={addPatient}
+                >
+                  Save Patient
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
 
-function Appointments({ setNotice }: { setNotice: (message: string) => void }) { const [items, setItems] = useState<Appointment[]>([]); const [loading, setLoading] = useState(true); const [message, setMessage] = useState(''); useEffect(() => { if (!supabase) return; supabase.from('appointments').select('id, patient_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, outlook_event_id, patients(first_name, last_name), profiles:provider_id(full_name)').order('appointment_date').order('appointment_time').then(({ data, error }) => { if (error) setMessage(error.message); setItems((data ?? []).map((item) => { const patient = item.patients as unknown as { first_name: string; last_name: string } | null; const provider = item.profiles as unknown as { full_name: string } | null; return { ...item, patient_name: patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown patient', provider_name: provider?.full_name ?? 'Unassigned' } })); setLoading(false) }) }, []); async function sync(item: Appointment) { try { const event = await createCalendarEvent({ patientName: item.patient_name, provider: item.provider_name, type: item.appointment_type, date: item.appointment_date, time: item.appointment_time, durationMinutes: item.duration_minutes, notes: item.reason ?? '' }); if (supabase) await supabase.from('appointments').update({ outlook_event_id: event.id }).eq('id', item.id); setItems((current) => current.map((appointment) => appointment.id === item.id ? { ...appointment, outlook_event_id: event.id } : appointment)); setNotice('Appointment synced to Outlook') } catch (error) { setMessage(error instanceof Error ? error.message : 'Outlook sync failed') } } return <section className="panel"><div className="panel-title">Appointment Calendar</div>{message && <p className="send-error">{message}</p>}{loading ? <div className="empty-state">Loading appointments...</div> : <div className="appointment-list">{items.map((item) => <div className="appointment-row" key={item.id}><time>{item.appointment_date} {item.appointment_time}</time><div className="appointment-block"><strong>{item.patient_name}</strong><span>{item.appointment_type} with {item.provider_name}</span></div><span className={`status-badge ${item.status}`}>{item.status}</span><span className={item.outlook_event_id ? 'calendar-sync synced' : 'calendar-sync'}>{item.outlook_event_id ? 'Outlook synced' : 'Local only'}</span><button type="button" className="classic-button" disabled={Boolean(item.outlook_event_id)} onClick={() => sync(item)}>{item.outlook_event_id ? 'Synced' : 'Sync Outlook'}</button></div>)}</div>}</section> }
+function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
+  const [items, setItems] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("appointments")
+      .select(
+        "id, patient_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, outlook_event_id, patients(first_name, last_name), profiles:provider_id(full_name)",
+      )
+      .order("appointment_date")
+      .order("appointment_time")
+      .then(({ data, error }) => {
+        if (error) setMessage(error.message);
+        setItems(
+          (data ?? []).map((item) => {
+            const patient = item.patients as unknown as {
+              first_name: string;
+              last_name: string;
+            } | null;
+            const provider = item.profiles as unknown as {
+              full_name: string;
+            } | null;
+            return {
+              ...item,
+              patient_name: patient
+                ? `${patient.first_name} ${patient.last_name}`
+                : "Unknown patient",
+              provider_name: provider?.full_name ?? "Unassigned",
+            };
+          }),
+        );
+        setLoading(false);
+      });
+  }, []);
+  async function sync(item: Appointment) {
+    try {
+      const event = await createCalendarEvent({
+        patientName: item.patient_name,
+        provider: item.provider_name,
+        type: item.appointment_type,
+        date: item.appointment_date,
+        time: item.appointment_time,
+        durationMinutes: item.duration_minutes,
+        notes: item.reason ?? "",
+      });
+      if (supabase)
+        await supabase
+          .from("appointments")
+          .update({ outlook_event_id: event.id })
+          .eq("id", item.id);
+      setItems((current) =>
+        current.map((appointment) =>
+          appointment.id === item.id
+            ? { ...appointment, outlook_event_id: event.id }
+            : appointment,
+        ),
+      );
+      setNotice("Appointment synced to Outlook");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Outlook sync failed",
+      );
+    }
+  }
+  return (
+    <section className="panel">
+      <div className="panel-title">Appointment Calendar</div>
+      {message && <p className="send-error">{message}</p>}
+      {loading ? (
+        <div className="empty-state">Loading appointments...</div>
+      ) : (
+        <div className="appointment-list">
+          {items.map((item) => (
+            <div className="appointment-row" key={item.id}>
+              <time>
+                {item.appointment_date} {item.appointment_time}
+              </time>
+              <div className="appointment-block">
+                <strong>{item.patient_name}</strong>
+                <span>
+                  {item.appointment_type} with {item.provider_name}
+                </span>
+              </div>
+              <span className={`status-badge ${item.status}`}>
+                {item.status}
+              </span>
+              <span
+                className={
+                  item.outlook_event_id
+                    ? "calendar-sync synced"
+                    : "calendar-sync"
+                }
+              >
+                {item.outlook_event_id ? "Outlook synced" : "Local only"}
+              </span>
+              <button
+                type="button"
+                className="classic-button"
+                disabled={Boolean(item.outlook_event_id)}
+                onClick={() => sync(item)}
+              >
+                {item.outlook_event_id ? "Synced" : "Sync Outlook"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-function ClinicalRecords({ selected }: { selected: Patient | null }) { const [notes, setNotes] = useState<Array<{ id: string; note_date: string; visit_type: string; subjective: string | null; assessment: string | null; plan: string | null }>>([]); const [history, setHistory] = useState<Array<{ id: string; record_type: string; name: string; detail: string | null; severity: string | null }>>([]); const [tab, setTab] = useState('Notes'); useEffect(() => { if (!supabase || !selected) return; Promise.all([supabase.from('clinical_notes').select('id, note_date, visit_type, subjective, assessment, plan').eq('patient_id', selected.id).order('note_date', { ascending: false }), supabase.from('medical_history').select('id, record_type, name, detail, severity').eq('patient_id', selected.id).order('created_at', { ascending: false })]).then(([notesResult, historyResult]) => { setNotes(notesResult.data ?? []); setHistory(historyResult.data ?? []) }) }, [selected]); if (!selected) return <section className="panel"><div className="empty-state">Select a patient first to view clinical records.</div></section>; return <section className="panel record-panel"><div className="panel-title">Clinical Records <span>{selected.first_name} {selected.last_name}</span></div><div className="tab-strip"><button type="button" className={tab === 'Notes' ? 'tab active' : 'tab'} onClick={() => setTab('Notes')}>Notes</button><button type="button" className={tab === 'History' ? 'tab active' : 'tab'} onClick={() => setTab('History')}>Medical History</button></div>{tab === 'Notes' ? <div className="note-list">{notes.map((note) => <article className="note-entry" key={note.id}><div className="note-meta"><strong>{note.note_date}</strong><span>{note.visit_type}</span></div><h3>Clinical note</h3><p>{note.assessment || note.subjective || note.plan || 'No note text recorded.'}</p></article>)}{!notes.length && <div className="empty-state">No clinical notes found for this patient.</div>}</div> : <div className="history-list">{history.map((entry) => <div className="history-entry" key={entry.id}><span className="history-kind">{entry.record_type}</span><div><strong>{entry.name}</strong><small>{entry.detail ?? 'No details recorded'}</small></div><span className="severity">{entry.severity ?? 'Active'}</span></div>)}{!history.length && <div className="empty-state">No medical history found for this patient.</div>}</div>}</section> }
+function ClinicalRecords({ selected }: { selected: Patient | null }) {
+  const [notes, setNotes] = useState<
+    Array<{
+      id: string;
+      note_date: string;
+      visit_type: string;
+      subjective: string | null;
+      assessment: string | null;
+      plan: string | null;
+    }>
+  >([]);
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      record_type: string;
+      name: string;
+      detail: string | null;
+      severity: string | null;
+    }>
+  >([]);
+  const [tab, setTab] = useState("Notes");
+  useEffect(() => {
+    if (!supabase || !selected) return;
+    Promise.all([
+      supabase
+        .from("clinical_notes")
+        .select("id, note_date, visit_type, subjective, assessment, plan")
+        .eq("patient_id", selected.id)
+        .order("note_date", { ascending: false }),
+      supabase
+        .from("medical_history")
+        .select("id, record_type, name, detail, severity")
+        .eq("patient_id", selected.id)
+        .order("created_at", { ascending: false }),
+    ]).then(([notesResult, historyResult]) => {
+      setNotes(notesResult.data ?? []);
+      setHistory(historyResult.data ?? []);
+    });
+  }, [selected]);
+  if (!selected)
+    return (
+      <section className="panel">
+        <div className="empty-state">
+          Select a patient first to view clinical records.
+        </div>
+      </section>
+    );
+  return (
+    <section className="panel record-panel">
+      <div className="panel-title">
+        Clinical Records{" "}
+        <span>
+          {selected.first_name} {selected.last_name}
+        </span>
+      </div>
+      <div className="tab-strip">
+        <button
+          type="button"
+          className={tab === "Notes" ? "tab active" : "tab"}
+          onClick={() => setTab("Notes")}
+        >
+          Notes
+        </button>
+        <button
+          type="button"
+          className={tab === "History" ? "tab active" : "tab"}
+          onClick={() => setTab("History")}
+        >
+          Medical History
+        </button>
+      </div>
+      {tab === "Notes" ? (
+        <div className="note-list">
+          {notes.map((note) => (
+            <article className="note-entry" key={note.id}>
+              <div className="note-meta">
+                <strong>{note.note_date}</strong>
+                <span>{note.visit_type}</span>
+              </div>
+              <h3>Clinical note</h3>
+              <p>
+                {note.assessment ||
+                  note.subjective ||
+                  note.plan ||
+                  "No note text recorded."}
+              </p>
+            </article>
+          ))}
+          {!notes.length && (
+            <div className="empty-state">
+              No clinical notes found for this patient.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="history-list">
+          {history.map((entry) => (
+            <div className="history-entry" key={entry.id}>
+              <span className="history-kind">{entry.record_type}</span>
+              <div>
+                <strong>{entry.name}</strong>
+                <small>{entry.detail ?? "No details recorded"}</small>
+              </div>
+              <span className="severity">{entry.severity ?? "Active"}</span>
+            </div>
+          ))}
+          {!history.length && (
+            <div className="empty-state">
+              No medical history found for this patient.
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
-function DentalChart({ patient, setNotice }: { patient: Patient | null; setNotice: (message: string) => void }) { const [records, setRecords] = useState<Array<{ id: string; tooth_number: number; condition: string; tooth_surface: string | null; severity: string | null; follow_up_required: boolean; notes: string | null }>>([]); const [selectedTooth, setSelectedTooth] = useState(16); useEffect(() => { if (!supabase || !patient) return; supabase.from('dental_chart_records').select('id, tooth_number, condition, tooth_surface, severity, follow_up_required, notes').eq('patient_id', patient.id).order('recorded_at', { ascending: false }).then(({ data }) => setRecords(data ?? [])) }, [patient]); if (!patient) return <section className="panel"><div className="empty-state">Select a patient first to view the dental chart.</div></section>; const selectedRecords = records.filter((record) => record.tooth_number === selectedTooth); return <div className="content-stack"><section className="panel dental-panel"><div className="panel-title">Interactive Dental Chart <span>{patient.first_name} {patient.last_name} | FDI notation</span></div><div className="tooth-grid">{toothNumbers.map((number) => <button type="button" key={number} className={`${selectedTooth === number ? 'tooth selected' : 'tooth'} ${records.some((record) => record.tooth_number === number) ? 'has-record' : ''}`} onClick={() => setSelectedTooth(number)}><span className="tooth-shape">{records.some((record) => record.tooth_number === number) ? '●' : ''}</span><strong>{number}</strong></button>)}</div></section><section className="panel"><div className="panel-title">Tooth {selectedTooth} History</div><div className="tooth-history">{selectedRecords.map((record) => <div className="tooth-record" key={record.id}><div><strong>{record.condition}</strong><small>{record.tooth_surface ?? 'Whole tooth'} | {record.severity ?? 'Unspecified'}</small><p>{record.notes ?? 'No notes recorded.'}</p>{record.follow_up_required && <span className="follow-up">Follow-up required</span>}</div></div>)}{!selectedRecords.length && <div className="empty-state">No conditions recorded for tooth {selectedTooth}.</div>}</div></section></div> }
+function DentalChart({
+  patient,
+  setNotice,
+}: {
+  patient: Patient | null;
+  setNotice: (message: string) => void;
+}) {
+  const [records, setRecords] = useState<
+    Array<{
+      id: string;
+      tooth_number: number;
+      condition: string;
+      tooth_surface: string | null;
+      severity: string | null;
+      follow_up_required: boolean;
+      notes: string | null;
+    }>
+  >([]);
+  const [selectedTooth, setSelectedTooth] = useState(16);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ condition: "", surface: "Whole tooth", severity: "Mild", notes: "", followUp: false });
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!supabase || !patient) return;
+    supabase
+      .from("dental_chart_records")
+      .select(
+        "id, tooth_number, condition, tooth_surface, severity, follow_up_required, notes",
+      )
+      .eq("patient_id", patient.id)
+      .order("recorded_at", { ascending: false })
+      .then(({ data }) => setRecords(data ?? []));
+  }, [patient]);
+  if (!patient)
+    return (
+      <section className="panel">
+        <div className="empty-state">
+          Select a patient first to view the dental chart.
+        </div>
+      </section>
+    );
+  const selectedRecords = records.filter(
+    (record) => record.tooth_number === selectedTooth,
+  );
+  async function addCondition() {
+    if (!supabase || !patient || !form.condition) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error: insertError } = await supabase.from("dental_chart_records").insert({
+      patient_id: patient.id,
+      tooth_number: selectedTooth,
+      tooth_surface: form.surface,
+      condition: form.condition,
+      severity: form.severity,
+      notes: form.notes,
+      follow_up_required: form.followUp,
+      recorded_by: auth.user?.id,
+    }).select("id, tooth_number, condition, tooth_surface, severity, follow_up_required, notes").single();
+    if (insertError) setError(insertError.message);
+    else if (data) { setRecords((current) => [data, ...current]); setShowForm(false); setForm({ condition: "", surface: "Whole tooth", severity: "Mild", notes: "", followUp: false }); setNotice(`Tooth ${selectedTooth} condition saved`); }
+  }
+  return (
+    <div className="content-stack">
+      <section className="panel dental-panel">
+        <div className="panel-title">
+          Interactive Dental Chart{" "}
+          <span>
+            {patient.first_name} {patient.last_name} | FDI notation
+          </span>
+        </div>
+        <div className="dental-toolbar"><button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ Record condition</button><button type="button" className="classic-button" onClick={() => window.print()}>Print chart</button></div>
+        {error && <p className="send-error">{error}</p>}
+        <div className="tooth-grid">
+          {toothNumbers.map((number) => (
+            <button
+              type="button"
+              key={number}
+              className={`${selectedTooth === number ? "tooth selected" : "tooth"} ${records.some((record) => record.tooth_number === number) ? "has-record" : ""}`}
+              onClick={() => setSelectedTooth(number)}
+            >
+              <span className="tooth-shape">
+                {records.some((record) => record.tooth_number === number)
+                  ? "●"
+                  : ""}
+              </span>
+              <strong>{number}</strong>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title">Tooth {selectedTooth} History</div>
+        <div className="tooth-history">
+          {selectedRecords.map((record) => (
+            <div className="tooth-record" key={record.id}>
+              <div>
+                <strong>{record.condition}</strong>
+                <small>
+                  {record.tooth_surface ?? "Whole tooth"} |{" "}
+                  {record.severity ?? "Unspecified"}
+                </small>
+                <p>{record.notes ?? "No notes recorded."}</p>
+                {record.follow_up_required && (
+                  <span className="follow-up">Follow-up required</span>
+                )}
+              </div>
+            </div>
+          ))}
+          {!selectedRecords.length && (
+            <div className="empty-state">
+              No conditions recorded for tooth {selectedTooth}.
+            </div>
+          )}
+        </div>
+      </section>
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">Tooth {selectedTooth} Condition <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><label>Condition<select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value })}><option value="">Select condition</option><option>Existing filling</option><option>Caries</option><option>Missing</option><option>Crown</option><option>Fracture</option><option>Healthy</option></select></label><label>Surface<select value={form.surface} onChange={(event) => setForm({ ...form, surface: event.target.value })}><option>Whole tooth</option><option>Occlusal</option><option>Mesial</option><option>Distal</option><option>Buccal</option><option>Lingual</option></select></label><label>Severity<select value={form.severity} onChange={(event) => setForm({ ...form, severity: event.target.value })}><option>Mild</option><option>Moderate</option><option>Severe</option></select></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><label className="check-label"><input type="checkbox" checked={form.followUp} onChange={(event) => setForm({ ...form, followUp: event.target.checked })} /> Follow-up required</label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.condition} onClick={addCondition}>Save Condition</button></div></div></section></div>}
+    </div>
+  );
+}
 
-function Treatments() { const [items, setItems] = useState<Array<{ id: string; treatment_date: string; procedure_name: string; tooth_number: number | null; cost: number; status: string; patients: { first_name: string; last_name: string } | null }>>([]); useEffect(() => { if (!supabase) return; supabase.from('treatments').select('id, treatment_date, procedure_name, tooth_number, cost, status, patients(first_name, last_name)').order('treatment_date', { ascending: false }).then(({ data }) => setItems((data ?? []) as unknown as typeof items)) }, []); return <section className="panel"><div className="panel-title">Treatment Register</div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Tooth</th><th>Cost</th><th>Status</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.treatment_date}</td><td>{item.patients ? `${item.patients.first_name} ${item.patients.last_name}` : '-'}</td><td>{item.procedure_name}</td><td>{item.tooth_number ?? '-'}</td><td>${Number(item.cost).toFixed(2)}</td><td><span className="status-badge">{item.status}</span></td></tr>)}</tbody></table>{!items.length && <div className="empty-state">No treatments found.</div>}</div></section> }
+function Treatments({ patient }: { patient: Patient | null }) {
+  const [items, setItems] = useState<
+    Array<{
+      id: string;
+      treatment_date: string;
+      procedure_name: string;
+      tooth_number: number | null;
+      cost: number;
+      status: string;
+      patients: { first_name: string; last_name: string } | null;
+    }>
+  >([]);
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ procedure_name: "", tooth_number: "", cost: "", status: "planned", notes: "" });
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("treatments")
+      .select(
+        "id, treatment_date, procedure_name, tooth_number, cost, status, patients(first_name, last_name)",
+      )
+      .order("treatment_date", { ascending: false })
+      .then(({ data }) => setItems((data ?? []) as unknown as typeof items));
+  }, []);
+  async function addTreatment() {
+    if (!supabase || !patient || !form.procedure_name) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error: insertError } = await supabase.from("treatments").insert({ patient_id: patient.id, provider_id: auth.user?.id, created_by: auth.user?.id, procedure_name: form.procedure_name, tooth_number: form.tooth_number ? Number(form.tooth_number) : null, cost: Number(form.cost || 0), status: form.status, notes: form.notes }).select("id, treatment_date, procedure_name, tooth_number, cost, status, patients(first_name, last_name)").single();
+    if (insertError) setError(insertError.message);
+    else if (data) { setItems((current) => [data as unknown as (typeof items)[number], ...current]); setShowForm(false); setForm({ procedure_name: "", tooth_number: "", cost: "", status: "planned", notes: "" }); }
+  }
+  return (
+    <section className="panel">
+      <div className="panel-title">Treatment Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!patient}>+ New Treatment</button></div>
+      {error && <p className="send-error">{error}</p>}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Patient</th>
+              <th>Procedure</th>
+              <th>Tooth</th>
+              <th>Cost</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.treatment_date}</td>
+                <td>
+                  {item.patients
+                    ? `${item.patients.first_name} ${item.patients.last_name}`
+                    : "-"}
+                </td>
+                <td>{item.procedure_name}</td>
+                <td>{item.tooth_number ?? "-"}</td>
+                <td>${Number(item.cost).toFixed(2)}</td>
+                <td>
+                  <span className="status-badge">{item.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!items.length && (
+          <div className="empty-state">No treatments found.</div>
+        )}
+      </div>
+      {!patient && <p className="empty-state">Select a patient from Patients before adding a treatment.</p>}
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Treatment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p><label>Procedure name<input value={form.procedure_name} onChange={(event) => setForm({ ...form, procedure_name: event.target.value })} /></label><label>Tooth number<input type="number" min="11" max="48" value={form.tooth_number} onChange={(event) => setForm({ ...form, tooth_number: event.target.value })} /></label><label>Cost<input type="number" min="0" step="0.01" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} /></label><label>Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.procedure_name} onClick={addTreatment}>Save Treatment</button></div></div></section></div>}
+    </section>
+  );
+}
 
-function Billing() { const [items, setItems] = useState<Array<{ id: string; invoice_number: string; invoice_date: string; total: number; amount_paid: number; balance: number; status: string; patient: string; email: string }>>([]); const [emailInvoice, setEmailInvoice] = useState<typeof items[number] | null>(null); const [recipient, setRecipient] = useState(''); const [message, setMessage] = useState(''); useEffect(() => { if (!supabase) return; supabase.from('invoices').select('id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)').order('invoice_date', { ascending: false }).then(({ data }) => setItems((data ?? []).map((item) => { const patient = item.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; return { ...item, patient: patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown patient', email: patient?.email ?? '' } }))) }, []); async function sendInvoice() { if (!emailInvoice) return; try { await sendInvoiceEmail({ invoiceNumber: emailInvoice.invoice_number, patientName: emailInvoice.patient, total: `$${Number(emailInvoice.total).toFixed(2)}`, balance: `$${Number(emailInvoice.balance).toFixed(2)}`, invoiceDate: emailInvoice.invoice_date, recipient }); setMessage('Invoice sent from your Outlook mailbox.') } catch (error) { setMessage(error instanceof Error ? error.message : 'Invoice email failed.') } } return <section className="panel"><div className="panel-title">Invoice Register</div><div className="table-wrap"><table><thead><tr><th>Invoice</th><th>Patient</th><th>Date</th><th>Total</th><th>Balance</th><th>Status</th><th>Email</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.invoice_number}</td><td>{item.patient}</td><td>{item.invoice_date}</td><td>${Number(item.total).toFixed(2)}</td><td>${Number(item.balance).toFixed(2)}</td><td><span className="status-badge">{item.status}</span></td><td><button type="button" className="classic-button" onClick={() => { setEmailInvoice(item); setRecipient(item.email); setMessage('') }}>Send email</button></td></tr>)}</tbody></table>{!items.length && <div className="empty-state">No invoices found.</div>}</div>{emailInvoice && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">Send Invoice by Outlook <button type="button" onClick={() => setEmailInvoice(null)}>X</button></div><div className="dialog-body"><p>Send {emailInvoice.invoice_number} from the logged-in Microsoft mailbox.</p><label>Recipient email<input type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} /></label>{message && <p className="send-success">{message}</p>}<div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setEmailInvoice(null)}>Cancel</button><button type="button" className="classic-button primary" disabled={!recipient} onClick={sendInvoice}>Send invoice</button></div></div></section></div>}</section> }
+function Billing({ patient }: { patient: Patient | null }) {
+  const [items, setItems] = useState<
+    Array<{
+      id: string;
+      invoice_number: string;
+      invoice_date: string;
+      total: number;
+      amount_paid: number;
+      balance: number;
+      status: string;
+      patient: string;
+      email: string;
+    }>
+  >([]);
+  const [emailInvoice, setEmailInvoice] = useState<
+    (typeof items)[number] | null
+  >(null);
+  const [recipient, setRecipient] = useState("");
+  const [message, setMessage] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("invoices")
+      .select(
+        "id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)",
+      )
+      .order("invoice_date", { ascending: false })
+      .then(({ data }) =>
+        setItems(
+          (data ?? []).map((item) => {
+            const patient = item.patients as unknown as {
+              first_name: string;
+              last_name: string;
+              email: string | null;
+            } | null;
+            return {
+              ...item,
+              patient: patient
+                ? `${patient.first_name} ${patient.last_name}`
+                : "Unknown patient",
+              email: patient?.email ?? "",
+            };
+          }),
+        ),
+      );
+  }, []);
+  async function sendInvoice() {
+    if (!emailInvoice) return;
+    try {
+      await sendInvoiceEmail({
+        invoiceNumber: emailInvoice.invoice_number,
+        patientName: emailInvoice.patient,
+        total: `$${Number(emailInvoice.total).toFixed(2)}`,
+        balance: `$${Number(emailInvoice.balance).toFixed(2)}`,
+        invoiceDate: emailInvoice.invoice_date,
+        recipient,
+      });
+      setMessage("Invoice sent from your Outlook mailbox.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Invoice email failed.",
+      );
+    }
+  }
+  async function addInvoice() {
+    if (!supabase || !patient || !form.total) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const total = Number(form.total);
+    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: patient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
+    if (insertError) setMessage(insertError.message);
+    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
+  }
+  return (
+    <section className="panel">
+      <div className="panel-title">Invoice Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!patient}>+ New Invoice</button></div>
+      {!patient && <p className="empty-state">Select a patient from Patients before creating an invoice.</p>}
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Patient</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.invoice_number}</td>
+                <td>{item.patient}</td>
+                <td>{item.invoice_date}</td>
+                <td>${Number(item.total).toFixed(2)}</td>
+                <td>${Number(item.balance).toFixed(2)}</td>
+                <td>
+                  <span className="status-badge">{item.status}</span>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="classic-button"
+                    onClick={() => {
+                      setEmailInvoice(item);
+                      setRecipient(item.email);
+                      setMessage("");
+                    }}
+                  >
+                    Send email
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!items.length && <div className="empty-state">No invoices found.</div>}
+      </div>
+      {emailInvoice && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              Send Invoice by Outlook{" "}
+              <button type="button" onClick={() => setEmailInvoice(null)}>
+                X
+              </button>
+            </div>
+            <div className="dialog-body">
+              <p>
+                Send {emailInvoice.invoice_number} from the logged-in Microsoft
+                mailbox.
+              </p>
+              <label>
+                Recipient email
+                <input
+                  type="email"
+                  value={recipient}
+                  onChange={(event) => setRecipient(event.target.value)}
+                />
+              </label>
+              {message && <p className="send-success">{message}</p>}
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => setEmailInvoice(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={!recipient}
+                  onClick={sendInvoice}
+                >
+                  Send invoice
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Invoice <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p><label>Total amount<input type="number" min="0" step="0.01" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label><label>Due date<input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.total} onClick={addInvoice}>Save Invoice</button></div></div></section></div>}
+    </section>
+  );
+}
 
-function Reports() { const [counts, setCounts] = useState({ appointments: 0, patients: 0, treatments: 0, collections: 0 }); useEffect(() => { if (!supabase) return; Promise.all([supabase.from('appointments').select('id', { count: 'exact', head: true }), supabase.from('patients').select('id', { count: 'exact', head: true }).eq('is_active', true), supabase.from('treatments').select('id', { count: 'exact', head: true }), supabase.from('invoices').select('amount_paid')]).then(([appointments, patients, treatments, invoices]) => setCounts({ appointments: appointments.count ?? 0, patients: patients.count ?? 0, treatments: treatments.count ?? 0, collections: (invoices.data ?? []).reduce((sum, invoice) => sum + Number(invoice.amount_paid), 0) })) }, []); return <div className="report-grid"><section className="panel report-card"><div className="panel-title">Appointments</div><strong className="report-number">{counts.appointments}</strong><span>records in database</span></section><section className="panel report-card"><div className="panel-title">Active Patients</div><strong className="report-number">{counts.patients}</strong><span>current patient records</span></section><section className="panel report-card"><div className="panel-title">Collections</div><strong className="report-number">${counts.collections.toFixed(2)}</strong><span>payments recorded</span></section><section className="panel report-card"><div className="panel-title">Treatments</div><strong className="report-number">{counts.treatments}</strong><span>treatment records</span></section></div> }
+function Reports() {
+  const [counts, setCounts] = useState({
+    appointments: 0,
+    patients: 0,
+    treatments: 0,
+    collections: 0,
+  });
+  useEffect(() => {
+    if (!supabase) return;
+    Promise.all([
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true }),
+      supabase
+        .from("patients")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", true),
+      supabase.from("treatments").select("id", { count: "exact", head: true }),
+      supabase.from("invoices").select("amount_paid"),
+    ]).then(([appointments, patients, treatments, invoices]) =>
+      setCounts({
+        appointments: appointments.count ?? 0,
+        patients: patients.count ?? 0,
+        treatments: treatments.count ?? 0,
+        collections: (invoices.data ?? []).reduce(
+          (sum, invoice) => sum + Number(invoice.amount_paid),
+          0,
+        ),
+      }),
+    );
+  }, []);
+  return (
+    <div className="report-grid">
+      <section className="panel report-card">
+        <div className="panel-title">Appointments</div>
+        <strong className="report-number">{counts.appointments}</strong>
+        <span>records in database</span>
+      </section>
+      <section className="panel report-card">
+        <div className="panel-title">Active Patients</div>
+        <strong className="report-number">{counts.patients}</strong>
+        <span>current patient records</span>
+      </section>
+      <section className="panel report-card">
+        <div className="panel-title">Collections</div>
+        <strong className="report-number">
+          ${counts.collections.toFixed(2)}
+        </strong>
+        <span>payments recorded</span>
+      </section>
+      <section className="panel report-card">
+        <div className="panel-title">Treatments</div>
+        <strong className="report-number">{counts.treatments}</strong>
+        <span>treatment records</span>
+      </section>
+    </div>
+  );
+}
 
-function UserManagement() { const [members, setMembers] = useState<Profile[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [filter, setFilter] = useState(''); useEffect(() => { if (!supabase) { setError('Supabase is not configured.'); setLoading(false); return } supabase.from('profiles').select('id, full_name, email, role, is_active, last_login_at').order('full_name').then(({ data, error: fetchError }) => { setMembers(data ?? []); setError(queryError(fetchError)); setLoading(false) }) }, []); async function toggle(member: Profile) { if (!supabase) return; const { error: updateError } = await supabase.from('profiles').update({ is_active: !member.is_active }).eq('id', member.id); if (updateError) setError(updateError.message); else setMembers((current) => current.map((item) => item.id === member.id ? { ...item, is_active: !member.is_active } : item)) } return <section className="panel"><div className="panel-title">Staff Directory</div><div className="filter-row"><label>Search <input value={filter} onChange={(event) => setFilter(event.target.value)} /></label></div>{error && <p className="send-error">{error}</p>}{loading ? <div className="empty-state">Loading profiles...</div> : <div className="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Action</th></tr></thead><tbody>{members.filter((member) => `${member.full_name} ${member.email}`.toLowerCase().includes(filter.toLowerCase())).map((member) => <tr key={member.id}><td>{member.full_name}</td><td>{member.email}</td><td>{member.role}</td><td><span className={`status-badge ${member.is_active ? 'active' : 'inactive'}`}>{member.is_active ? 'Active' : 'Inactive'}</span></td><td>{member.last_login_at ?? 'Never'}</td><td><button type="button" className="classic-button" onClick={() => toggle(member)}>{member.is_active ? 'Deactivate' : 'Activate'}</button></td></tr>)}</tbody></table>{!members.length && <div className="empty-state">No staff profiles found.</div>}</div>}</section> }
+function UserManagement() {
+  const [members, setMembers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("");
+  useEffect(() => {
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      setLoading(false);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, role, is_active, last_login_at")
+      .order("full_name")
+      .then(({ data, error: fetchError }) => {
+        setMembers(data ?? []);
+        setError(queryError(fetchError));
+        setLoading(false);
+      });
+  }, []);
+  async function toggle(member: Profile) {
+    if (!supabase) return;
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ is_active: !member.is_active })
+      .eq("id", member.id);
+    if (updateError) setError(updateError.message);
+    else
+      setMembers((current) =>
+        current.map((item) =>
+          item.id === member.id
+            ? { ...item, is_active: !member.is_active }
+            : item,
+        ),
+      );
+  }
+  return (
+    <section className="panel">
+      <div className="panel-title">Staff Directory</div>
+      <div className="filter-row">
+        <label>
+          Search{" "}
+          <input
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        </label>
+      </div>
+      {error && <p className="send-error">{error}</p>}
+      {loading ? (
+        <div className="empty-state">Loading profiles...</div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last login</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members
+                .filter((member) =>
+                  `${member.full_name} ${member.email}`
+                    .toLowerCase()
+                    .includes(filter.toLowerCase()),
+                )
+                .map((member) => (
+                  <tr key={member.id}>
+                    <td>{member.full_name}</td>
+                    <td>{member.email}</td>
+                    <td>{member.role}</td>
+                    <td>
+                      <span
+                        className={`status-badge ${member.is_active ? "active" : "inactive"}`}
+                      >
+                        {member.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td>{member.last_login_at ?? "Never"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="classic-button"
+                        onClick={() => toggle(member)}
+                      >
+                        {member.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {!members.length && (
+            <div className="empty-state">No staff profiles found.</div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
-function PracticeSettings() { const [settings, setSettings] = useState<Record<string, string>>({ name: '', phone: '', email: '', address: '', city: '', state: '', postal_code: '', open: '08:00', close: '18:00', interval: '15' }); const [message, setMessage] = useState(''); useEffect(() => { if (!supabase) return; supabase.from('practice_settings').select('*').eq('id', true).single().then(({ data, error }) => { if (error) setMessage(error.message); if (data) { const hours = data.business_hours as { open?: string; close?: string }; setSettings({ name: data.name ?? '', phone: data.phone ?? '', email: data.email ?? '', address: data.address ?? '', city: data.city ?? '', state: data.state ?? '', postal_code: data.postal_code ?? '', open: hours.open ?? '08:00', close: hours.close ?? '18:00', interval: String(data.appointment_interval_minutes ?? 15) }) } }) }, []); const save = async () => { if (!supabase) return; const { error } = await supabase.from('practice_settings').upsert({ id: true, name: settings.name, phone: settings.phone, email: settings.email, address: settings.address, city: settings.city, state: settings.state, postal_code: settings.postal_code, business_hours: { open: settings.open, close: settings.close }, appointment_interval_minutes: Number(settings.interval) }); setMessage(error?.message ?? 'Practice settings saved.') }; const update = (field: string, value: string) => setSettings((current) => ({ ...current, [field]: value })); return <div className="content-stack"><section className="panel settings-panel"><div className="panel-title">Practice Information</div><div className="settings-form">{[['name', 'Practice name'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address'], ['city', 'City'], ['state', 'State'], ['postal_code', 'Postal code']].map(([field, label]) => <label key={field}>{label}<input value={settings[field]} onChange={(event) => update(field, event.target.value)} /></label>)}</div></section><section className="panel settings-panel"><div className="panel-title">Appointment Configuration</div><div className="settings-form"><label>Opening time<input type="time" value={settings.open} onChange={(event) => update('open', event.target.value)} /></label><label>Closing time<input type="time" value={settings.close} onChange={(event) => update('close', event.target.value)} /></label><label>Interval<select value={settings.interval} onChange={(event) => update('interval', event.target.value)}><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label></div><div className="settings-actions"><button type="button" className="classic-button primary" onClick={save}>Save Settings</button>{message && <span className="send-success">{message}</span>}</div></section></div> }
+function PracticeSettings() {
+  const [settings, setSettings] = useState<Record<string, string>>({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    open: "08:00",
+    close: "18:00",
+    interval: "15",
+  });
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("practice_settings")
+      .select("*")
+      .eq("id", true)
+      .single()
+      .then(({ data, error }) => {
+        if (error) setMessage(error.message);
+        if (data) {
+          const hours = data.business_hours as {
+            open?: string;
+            close?: string;
+          };
+          setSettings({
+            name: data.name ?? "",
+            phone: data.phone ?? "",
+            email: data.email ?? "",
+            address: data.address ?? "",
+            city: data.city ?? "",
+            state: data.state ?? "",
+            postal_code: data.postal_code ?? "",
+            open: hours.open ?? "08:00",
+            close: hours.close ?? "18:00",
+            interval: String(data.appointment_interval_minutes ?? 15),
+          });
+        }
+      });
+  }, []);
+  const save = async () => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("practice_settings")
+      .upsert({
+        id: true,
+        name: settings.name,
+        phone: settings.phone,
+        email: settings.email,
+        address: settings.address,
+        city: settings.city,
+        state: settings.state,
+        postal_code: settings.postal_code,
+        business_hours: { open: settings.open, close: settings.close },
+        appointment_interval_minutes: Number(settings.interval),
+      });
+    setMessage(error?.message ?? "Practice settings saved.");
+  };
+  const update = (field: string, value: string) =>
+    setSettings((current) => ({ ...current, [field]: value }));
+  return (
+    <div className="content-stack">
+      <section className="panel settings-panel">
+        <div className="panel-title">Practice Information</div>
+        <div className="settings-form">
+          {[
+            ["name", "Practice name"],
+            ["phone", "Phone"],
+            ["email", "Email"],
+            ["address", "Address"],
+            ["city", "City"],
+            ["state", "State"],
+            ["postal_code", "Postal code"],
+          ].map(([field, label]) => (
+            <label key={field}>
+              {label}
+              <input
+                value={settings[field]}
+                onChange={(event) => update(field, event.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+      <section className="panel settings-panel">
+        <div className="panel-title">Appointment Configuration</div>
+        <div className="settings-form">
+          <label>
+            Opening time
+            <input
+              type="time"
+              value={settings.open}
+              onChange={(event) => update("open", event.target.value)}
+            />
+          </label>
+          <label>
+            Closing time
+            <input
+              type="time"
+              value={settings.close}
+              onChange={(event) => update("close", event.target.value)}
+            />
+          </label>
+          <label>
+            Interval
+            <select
+              value={settings.interval}
+              onChange={(event) => update("interval", event.target.value)}
+            >
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </label>
+        </div>
+        <div className="settings-actions">
+          <button
+            type="button"
+            className="classic-button primary"
+            onClick={save}
+          >
+            Save Settings
+          </button>
+          {message && <span className="send-success">{message}</span>}
+        </div>
+      </section>
+    </div>
+  );
+}
 
-export default App
+export default App;
