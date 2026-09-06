@@ -65,7 +65,7 @@ export async function sendInvoiceEmail(invoice: InvoiceEmail) {
 
   const message = {
     message: {
-      subject: `Invoice ${invoice.invoiceNumber} from Dental Office Manager`,
+      subject: `Invoice ${invoice.invoiceNumber} from Sponty Dental Services`,
       body: {
         contentType: 'HTML',
         content: `<p>Hello,</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> is available.</p><p><strong>Patient:</strong> ${invoice.patientName}<br><strong>Invoice date:</strong> ${invoice.invoiceDate}<br><strong>Total:</strong> ${invoice.total}<br><strong>Balance due:</strong> ${invoice.balance}</p>${invoice.notes ? `<p>${invoice.notes}</p>` : ''}<p>Please contact the practice if you have any questions.</p>`,

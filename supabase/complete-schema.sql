@@ -1,4 +1,4 @@
--- Dental Office Manager: complete replacement schema
+-- Sponty Dental Services: complete replacement schema
 -- COPY/PASTE THIS ENTIRE FILE INTO Supabase SQL Editor.
 -- WARNING: this deletes existing application tables and their data.
 -- It does NOT delete auth.users or your Supabase Auth identities.
@@ -37,7 +37,7 @@ create type public.invoice_status as enum ('pending', 'partial', 'paid', 'overdu
 
 create table public.practice_settings (
   id boolean primary key default true check (id),
-  name text not null default 'Dental Office', address text, city text, state text, postal_code text,
+  name text not null default 'Sponty Dental Services', address text, city text, state text, postal_code text,
   phone text, email text,
   business_hours jsonb not null default '{"open":"08:00","close":"18:00"}'::jsonb,
   appointment_interval_minutes integer not null default 15 check (appointment_interval_minutes between 5 and 60),

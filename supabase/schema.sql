@@ -1,4 +1,4 @@
--- Dental Office Manager: single-practice Supabase schema
+-- Sponty Dental Services: single-practice Supabase schema
 -- Run in the Supabase SQL editor after creating a project.
 
 create extension if not exists pgcrypto;
@@ -10,7 +10,7 @@ create type public.invoice_status as enum ('pending', 'partial', 'paid', 'overdu
 
 create table public.practice_settings (
   id boolean primary key default true check (id),
-  name text not null default 'Dental Office',
+  name text not null default 'Sponty Dental Services',
   address text,
   city text,
   state text,

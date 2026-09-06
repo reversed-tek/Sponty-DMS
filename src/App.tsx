@@ -120,7 +120,7 @@ function App() {
     return (
       <div className="auth-screen">
         <section className="classic-dialog login-dialog">
-          <div className="dialog-title">Dental Office Manager</div>
+          <div className="dialog-title">Sponty Dental Services</div>
           <div className="dialog-body">
             <h1>
               {sessionUser ? "Account setup required" : "Sign in required"}
@@ -172,7 +172,7 @@ function App() {
     <div className="app-window">
       <header className="title-bar">
         <div className="title-bar-text">
-          <span className="app-mark">+</span> Dental Office Manager
+          <span className="app-mark">+</span> Sponty Dental Services
         </div>
         <div className="window-controls">
           <button type="button">_</button>

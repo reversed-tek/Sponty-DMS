@@ -1,4 +1,4 @@
-# Dental Office Manager Deployment Guide
+# Sponty Dental Services Deployment Guide
 
 This guide deploys the single-practice application with Supabase Auth using Microsoft Entra ID as the OAuth provider. This architecture is recommended because Supabase Auth issues the session JWT used by `auth.uid()` and therefore works correctly with Supabase Row Level Security.
 
@@ -87,7 +87,7 @@ The frontend should call the OAuth flow with an explicit return path, for exampl
 
 ## 5. Frontend Environment Variables
 
-Create `.env.local` in `rebuilt-app`:
+Create `.env.local` in the project root:
 
 ```env
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
@@ -179,7 +179,7 @@ const { data: profile } = await supabase
 
 if (!profile?.is_active) {
   await supabase.auth.signOut()
-  throw new Error('This account is not active in Dental Office Manager.')
+  throw new Error('This account is not active in Sponty Dental Services.')
 }
 ```
 
@@ -199,7 +199,7 @@ Do not send a raw MSAL token to Supabase and assume it will satisfy `auth.uid()`
 
 ## 10. Local Development
 
-From the `rebuilt-app` directory:
+From the project root:
 
 ```bash
 npm install
