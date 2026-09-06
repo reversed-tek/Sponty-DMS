@@ -21,10 +21,9 @@ Do not use a browser-only MSAL token as a substitute for the Supabase session. A
 1. Open the existing project at [supabase.com](https://supabase.com).
 2. Open **Project Settings > API** and keep the existing project URL and publishable anon key.
 3. Confirm that the existing Auth users should be preserved.
-4. In **SQL Editor**, run [`supabase/reset-public-schema.sql`](supabase/reset-public-schema.sql) only after confirming the old application data can be discarded.
-5. Immediately run [`supabase/schema.sql`](supabase/schema.sql).
+4. In **SQL Editor**, run [`supabase/complete-schema.sql`](supabase/complete-schema.sql) only after confirming the old application data can be discarded.
 
-The reset script removes only the `public` application tables, functions, and enums. It does not remove `auth.users`, so the existing Supabase Auth identities remain available. Take a database backup before running it.
+The complete script removes and recreates only the `public` application tables, functions, and enums. It does not remove `auth.users`, so the existing Supabase Auth identities remain available. Take a database backup before running it. The separate `reset-public-schema.sql` and `schema.sql` files remain available for advanced or staged deployments.
 
 The schema creates:
 
