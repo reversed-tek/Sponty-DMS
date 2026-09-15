@@ -1,8 +1,8 @@
 :root {
-  --brand-blue: #a8c2ea;
-  --brand-blue-dark: #7c9fd8;
-  --brand-blue-soft: #edf4ff;
-  --navy-text: #1f3352;
+  --brand-blue: #0078d4;
+  --brand-blue-dark: #005a9e;
+  --brand-blue-soft: #dcecff;
+  --navy-text: #17324d;
 }
 
 #root { min-height: 100vh; padding: 18px; }
@@ -18,15 +18,15 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
  .appointment-row { grid-template-columns: 90px minmax(150px, 1fr) 105px 100px 95px; }.settings-panel { max-width: 900px; }.settings-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; }.settings-form label { display: grid; gap: 3px; }.settings-actions { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; }.settings-actions .send-success { margin: 0; }
 @media (max-width: 560px) { #root { padding: 0; }.workspace { display: block; }.sidebar { width: 100%; padding: 5px; border-right: 0; border-bottom: 1px solid #808080; }.sidebar nav { display: grid; grid-template-columns: repeat(2, 1fr); }.sidebar-section, .sidebar-note { display: none; }.main-panel { padding: 8px; }.toolbar { overflow-x: auto; }.filter-row { align-items: stretch; flex-wrap: wrap; }.filter-row .classic-button { margin-left: 0; }.patient-grid { grid-template-columns: 1fr 1fr; }.schedule-row { grid-template-columns: 65px 1fr; }.schedule-row .status-badge { grid-column: 2; }.appointment-row { grid-template-columns: 72px 1fr; }.appointment-row .status-badge, .appointment-row .classic-button, .appointment-row .calendar-sync { grid-column: 2; justify-self: start; }.settings-form { grid-template-columns: 1fr; }.status-right { display: none; } }
 
-/* Keep the classic desktop language while reducing the heavy gray contrast. */
-.app-window { background: #f3f6fb; box-shadow: 2px 2px 0 #6f7d91; }
-.menu-bar, .toolbar { background: #e8edf5; border-color: #c0cad9; }
-.toolbar-button, .classic-button { background: #f5f7fb; border-color: #fff #8b98aa #8b98aa #fff; }
-.toolbar-button:hover, .classic-button:hover { background: #e6eefb; }
-.main-panel { background: #e7ecf4; }
-.panel { background: #f5f7fb; border-color: #fff #aab5c5 #aab5c5 #fff; box-shadow: 1px 1px 0 #8491a3; }
+/* Keep the classic desktop language with Azure blue and visible gray chrome. */
+.app-window { background: #c6cbd2; box-shadow: 2px 2px 0 #59636f; }
+.menu-bar, .toolbar { background: #cbd0d6; border-color: #a4adb8; }
+.toolbar-button, .classic-button { background: #dfe3e8; border-color: #fff #697582 #697582 #fff; }
+.toolbar-button:hover, .classic-button:hover { background: #c8e2f8; }
+.main-panel { background: #d6dbe1; }
+.panel { background: #e8ebee; border-color: #fff #7e8995 #7e8995 #fff; box-shadow: 1px 1px 0 #68737e; }
 .panel-title { background: var(--brand-blue-dark); }
-.tab, .tab-strip { background: #e8edf5; }
-.tab.active { background: #f5f7fb; border-bottom-color: #f5f7fb; }
-.action-row { background: #f5f7fb; border-color: #fff #b0bac8 #b0bac8 #fff; }
-.action-row:hover { background: #e6eefb; }
+.tab, .tab-strip { background: #cbd0d6; }
+.tab.active { background: #e8ebee; border-bottom-color: #e8ebee; }
+.action-row { background: #e8ebee; border-color: #fff #909aa5 #909aa5 #fff; }
+.action-row:hover { background: #c8e2f8; }
