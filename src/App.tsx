@@ -226,7 +226,6 @@ function App() {
                 className={page === item ? "nav-item active" : "nav-item"}
                 onClick={() => navigate(item)}
               >
-                <span className="nav-icon">{item[0]}</span>
                 {item}
               </button>
             ))}
@@ -239,7 +238,7 @@ function App() {
             }
             onClick={() => navigate("User Management")}
           >
-            <span className="nav-icon">U</span>Users
+            Users
           </button>
           <button
             type="button"
@@ -248,7 +247,7 @@ function App() {
             }
             onClick={() => navigate("Practice Settings")}
           >
-            <span className="nav-icon">S</span>Settings
+            Settings
           </button>
           <div className="sidebar-note">
             <strong>Signed in as</strong>
@@ -288,7 +287,9 @@ function App() {
           {page === "Dental Chart" && (
             <DentalChart patient={selectedPatient} setNotice={setNotice} />
           )}
-          {page === "Treatments" && <Treatments patient={selectedPatient} />}
+          {page === "Treatments" && (
+            <Treatments patient={selectedPatient} setNotice={setNotice} />
+          )}
           {page === "Billing" && <Billing patient={selectedPatient} />}
           {page === "Reports" && <Reports />}
           {page === "User Management" && <UserManagement />}
@@ -367,7 +368,6 @@ function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
           className="action-row"
           onClick={() => navigate("Patients")}
         >
-          <span>P</span>
           <strong>Open patients</strong>
           <small>Search the live patient register</small>
         </button>
@@ -376,7 +376,6 @@ function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
           className="action-row"
           onClick={() => navigate("Appointments")}
         >
-          <span>A</span>
           <strong>Open appointments</strong>
           <small>Review the live schedule</small>
         </button>
@@ -385,7 +384,6 @@ function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
           className="action-row"
           onClick={() => navigate("Billing")}
         >
-              <span>₱</span>
           <strong>Open billing</strong>
           <small>Review outstanding invoices</small>
         </button>
@@ -409,6 +407,7 @@ function Patients({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -416,6 +415,16 @@ function Patients({
     phone: "",
     email: "",
   });
+
+  const resetForm = () =>
+    setForm({
+      first_name: "",
+      last_name: "",
+      date_of_birth: "",
+      phone: "",
+      email: "",
+    });
+
   useEffect(() => {
     if (!supabase) return;
     supabase
@@ -430,6 +439,7 @@ function Patients({
         setLoading(false);
       });
   }, []);
+
   const filtered = useMemo(
     () =>
       patients.filter((patient) =>
@@ -439,33 +449,113 @@ function Patients({
       ),
     [patients, search],
   );
-  async function addPatient() {
+
+  const openNewPatient = () => {
+    setEditingPatient(null);
+    resetForm();
+    setShowAdd(true);
+  };
+
+  const openEditPatient = (patient: Patient) => {
+    setEditingPatient(patient);
+    setForm({
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      date_of_birth: patient.date_of_birth,
+      phone: patient.phone ?? "",
+      email: patient.email ?? "",
+    });
+    setShowAdd(true);
+  };
+
+  async function savePatient() {
     if (!supabase) return;
+    const payload = {
+      first_name: form.first_name.trim(),
+      last_name: form.last_name.trim(),
+      date_of_birth: form.date_of_birth,
+      phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+    };
+
+    if (editingPatient) {
+      const { error: updateError } = await supabase
+        .from("patients")
+        .update(payload)
+        .eq("id", editingPatient.id);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      setPatients((current) =>
+        current.map((patient) =>
+          patient.id === editingPatient.id
+            ? { ...patient, ...payload, phone: payload.phone ?? "", email: payload.email ?? "" }
+            : patient,
+        ),
+      );
+      setSelected(
+        selected && selected.id === editingPatient.id
+          ? { ...selected, ...payload, phone: payload.phone ?? "", email: payload.email ?? "" }
+          : selected,
+      );
+      setNotice("Patient updated");
+      setShowAdd(false);
+      setEditingPatient(null);
+      resetForm();
+      return;
+    }
+
     const { data: user } = await supabase.auth.getUser();
     const { data, error: insertError } = await supabase
       .from("patients")
       .insert({
-        ...form,
+        ...payload,
         patient_number: `P-${Date.now().toString().slice(-6)}`,
         created_by: user.user?.id,
       })
       .select()
       .single();
-    if (insertError) setError(insertError.message);
-    else if (data) {
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    if (data) {
       setPatients((current) => [data, ...current]);
       setSelected(data);
-      setShowAdd(false);
-      setForm({
-        first_name: "",
-        last_name: "",
-        date_of_birth: "",
-        phone: "",
-        email: "",
-      });
       setNotice("Patient saved to Supabase");
+      setShowAdd(false);
+      setEditingPatient(null);
+      resetForm();
     }
   }
+
+  async function deletePatient(patient: Patient) {
+    if (!supabase) return;
+    const confirmed = window.confirm(
+      `Delete patient ${patient.first_name} ${patient.last_name}? This will also remove associated records from the system.`,
+    );
+    if (!confirmed) return;
+
+    const { error: deleteError } = await supabase
+      .from("patients")
+      .delete()
+      .eq("id", patient.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setPatients((current) => current.filter((item) => item.id !== patient.id));
+    if (selected?.id === patient.id) setSelected(null);
+    setNotice("Patient deleted");
+  }
+
   return (
     <div className="content-stack">
       <section className="panel">
@@ -474,7 +564,7 @@ function Patients({
           <button
             type="button"
             className="classic-button primary"
-            onClick={() => setShowAdd(true)}
+            onClick={openNewPatient}
           >
             + New Patient
           </button>
@@ -506,6 +596,7 @@ function Patients({
                   <th>Phone</th>
                   <th>Status</th>
                   <th>Alerts</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -533,6 +624,30 @@ function Patients({
                       </span>
                     </td>
                     <td>{patient.allergies ?? "-"}</td>
+                    <td>
+                      <div className="dialog-actions">
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEditPatient(patient);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deletePatient(patient);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -576,8 +691,15 @@ function Patients({
         <div className="modal-backdrop">
           <section className="classic-dialog" role="dialog" aria-modal="true">
             <div className="dialog-title">
-              New Patient{" "}
-              <button type="button" onClick={() => setShowAdd(false)}>
+              {editingPatient ? "Edit Patient" : "New Patient"}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false);
+                  setEditingPatient(null);
+                  resetForm();
+                }}
+              >
                 X
               </button>
             </div>
@@ -633,7 +755,11 @@ function Patients({
                 <button
                   type="button"
                   className="classic-button"
-                  onClick={() => setShowAdd(false)}
+                  onClick={() => {
+                    setShowAdd(false);
+                    setEditingPatient(null);
+                    resetForm();
+                  }}
                 >
                   Cancel
                 </button>
@@ -643,9 +769,9 @@ function Patients({
                   disabled={
                     !form.first_name || !form.last_name || !form.date_of_birth
                   }
-                  onClick={addPatient}
+                  onClick={savePatient}
                 >
-                  Save Patient
+                  {editingPatient ? "Save Changes" : "Save Patient"}
                 </button>
               </div>
             </div>
@@ -1023,41 +1149,178 @@ function DentalChart({
   );
 }
 
-function Treatments({ patient }: { patient: Patient | null }) {
+function Treatments({
+  patient,
+  setNotice,
+}: {
+  patient: Patient | null;
+  setNotice: (message: string) => void;
+}) {
   const [items, setItems] = useState<
     Array<{
       id: string;
+      patient_id: string;
       treatment_date: string;
       procedure_name: string;
       tooth_number: number | null;
       cost: number;
       status: string;
+      notes: string | null;
       patients: { first_name: string; last_name: string } | null;
     }>
   >([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingTreatment, setEditingTreatment] = useState<(typeof items)[number] | null>(null);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ procedure_name: "", tooth_number: "", cost: "", status: "planned", notes: "" });
+  const [form, setForm] = useState({
+    procedure_name: "",
+    tooth_number: "",
+    cost: "",
+    status: "planned",
+    notes: "",
+  });
+
+  const resetForm = () =>
+    setForm({
+      procedure_name: "",
+      tooth_number: "",
+      cost: "",
+      status: "planned",
+      notes: "",
+    });
+
   useEffect(() => {
     if (!supabase) return;
     supabase
       .from("treatments")
       .select(
-        "id, treatment_date, procedure_name, tooth_number, cost, status, patients(first_name, last_name)",
+        "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
       )
       .order("treatment_date", { ascending: false })
-      .then(({ data }) => setItems((data ?? []) as unknown as typeof items));
+      .then(({ data, error: fetchError }) => {
+        setItems((data ?? []) as unknown as typeof items);
+        if (fetchError) setError(fetchError.message);
+      });
   }, []);
-  async function addTreatment() {
-    if (!supabase || !patient || !form.procedure_name) return;
-    const { data: auth } = await supabase.auth.getUser();
-    const { data, error: insertError } = await supabase.from("treatments").insert({ patient_id: patient.id, provider_id: auth.user?.id, created_by: auth.user?.id, procedure_name: form.procedure_name, tooth_number: form.tooth_number ? Number(form.tooth_number) : null, cost: Number(form.cost || 0), status: form.status, notes: form.notes }).select("id, treatment_date, procedure_name, tooth_number, cost, status, patients(first_name, last_name)").single();
-    if (insertError) setError(insertError.message);
-    else if (data) { setItems((current) => [data as unknown as (typeof items)[number], ...current]); setShowForm(false); setForm({ procedure_name: "", tooth_number: "", cost: "", status: "planned", notes: "" }); }
+
+  const openNewTreatment = () => {
+    if (!patient) return;
+    setEditingTreatment(null);
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEditTreatment = (item: (typeof items)[number]) => {
+    setEditingTreatment(item);
+    setForm({
+      procedure_name: item.procedure_name,
+      tooth_number: item.tooth_number?.toString() ?? "",
+      cost: String(item.cost),
+      status: item.status,
+      notes: item.notes ?? "",
+    });
+    setShowForm(true);
+  };
+
+  async function saveTreatment() {
+    if (!supabase || !patient) return;
+    if (!form.procedure_name) return;
+
+    const payload = {
+      patient_id: editingTreatment?.patient_id ?? patient.id,
+      procedure_name: form.procedure_name.trim(),
+      tooth_number: form.tooth_number ? Number(form.tooth_number) : null,
+      cost: Number(form.cost || 0),
+      status: form.status,
+      notes: form.notes.trim() || null,
+    };
+
+    if (editingTreatment) {
+      const { error: updateError } = await supabase
+        .from("treatments")
+        .update(payload)
+        .eq("id", editingTreatment.id);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      setItems((current) =>
+        current.map((item) =>
+          item.id === editingTreatment.id
+            ? { ...item, ...payload, cost: Number(payload.cost) }
+            : item,
+        ),
+      );
+      setNotice("Treatment updated");
+    } else {
+      const { data: auth } = await supabase.auth.getUser();
+      const { data, error: insertError } = await supabase
+        .from("treatments")
+        .insert({
+          ...payload,
+          provider_id: auth.user?.id,
+          created_by: auth.user?.id,
+        })
+        .select(
+          "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
+        )
+        .single();
+
+      if (insertError) {
+        setError(insertError.message);
+        return;
+      }
+
+      if (data) {
+        setItems((current) => [data as unknown as (typeof items)[number], ...current]);
+      }
+      setNotice("Treatment saved");
+    }
+
+    setShowForm(false);
+    setEditingTreatment(null);
+    resetForm();
   }
+
+  async function deleteTreatment(id: string) {
+    if (!supabase) return;
+    const target = items.find((item) => item.id === id);
+    if (!target) return;
+
+    const confirmed = window.confirm(
+      `Delete the ${target.procedure_name} treatment record?`,
+    );
+    if (!confirmed) return;
+
+    const { error: deleteError } = await supabase
+      .from("treatments")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setItems((current) => current.filter((item) => item.id !== id));
+    setNotice("Treatment deleted");
+  }
+
   return (
     <section className="panel">
-      <div className="panel-title">Treatment Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!patient}>+ New Treatment</button></div>
+      <div className="panel-title">
+        Treatment Register{" "}
+        <button
+          type="button"
+          className="classic-button primary"
+          onClick={openNewTreatment}
+          disabled={!patient}
+        >
+          + New Treatment
+        </button>
+      </div>
       {error && <p className="send-error">{error}</p>}
       <div className="table-wrap">
         <table>
@@ -1069,6 +1332,7 @@ function Treatments({ patient }: { patient: Patient | null }) {
               <th>Tooth</th>
               <th>Cost</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1086,6 +1350,24 @@ function Treatments({ patient }: { patient: Patient | null }) {
                 <td>
                   <span className="status-badge">{item.status}</span>
                 </td>
+                <td>
+                  <div className="dialog-actions">
+                    <button
+                      type="button"
+                      className="classic-button"
+                      onClick={() => openEditTreatment(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="classic-button"
+                      onClick={() => deleteTreatment(item.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1095,7 +1377,88 @@ function Treatments({ patient }: { patient: Patient | null }) {
         )}
       </div>
       {!patient && <p className="empty-state">Select a patient from Patients before adding a treatment.</p>}
-      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Treatment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p><label>Procedure name<input value={form.procedure_name} onChange={(event) => setForm({ ...form, procedure_name: event.target.value })} /></label><label>Tooth number<input type="number" min="11" max="48" value={form.tooth_number} onChange={(event) => setForm({ ...form, tooth_number: event.target.value })} /></label><label>Cost<input type="number" min="0" step="0.01" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} /></label><label>Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.procedure_name} onClick={addTreatment}>Save Treatment</button></div></div></section></div>}
+      {showForm && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              {editingTreatment ? "Edit Treatment" : "New Treatment"}{" "}
+              <button type="button" onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}>
+                X
+              </button>
+            </div>
+            <div className="dialog-body">
+              <p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p>
+              <label>
+                Procedure name
+                <input
+                  value={form.procedure_name}
+                  onChange={(event) =>
+                    setForm({ ...form, procedure_name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Tooth number
+                <input
+                  type="number"
+                  min="11"
+                  max="48"
+                  value={form.tooth_number}
+                  onChange={(event) =>
+                    setForm({ ...form, tooth_number: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Cost
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.cost}
+                  onChange={(event) => setForm({ ...form, cost: event.target.value })}
+                />
+              </label>
+              <label>
+                Status
+                <select
+                  value={form.status}
+                  onChange={(event) => setForm({ ...form, status: event.target.value })}
+                >
+                  <option value="planned">Planned</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+              <label>
+                Notes
+                <textarea
+                  value={form.notes}
+                  onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                />
+              </label>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={!form.procedure_name}
+                  onClick={saveTreatment}
+                >
+                  {editingTreatment ? "Save Changes" : "Save Treatment"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
@@ -1334,6 +1697,25 @@ function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingMember, setEditingMember] = useState<Profile | null>(null);
+  const [form, setForm] = useState({
+    auth_id: "",
+    full_name: "",
+    email: "",
+    role: "receptionist",
+    is_active: true,
+  });
+
+  const resetForm = () =>
+    setForm({
+      auth_id: "",
+      full_name: "",
+      email: "",
+      role: "receptionist",
+      is_active: true,
+    });
+
   useEffect(() => {
     if (!supabase) {
       setError("Supabase is not configured.");
@@ -1350,6 +1732,25 @@ function UserManagement() {
         setLoading(false);
       });
   }, []);
+
+  const openAddUser = () => {
+    setEditingMember(null);
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEditUser = (member: Profile) => {
+    setEditingMember(member);
+    setForm({
+      auth_id: member.id,
+      full_name: member.full_name,
+      email: member.email,
+      role: member.role,
+      is_active: member.is_active,
+    });
+    setShowForm(true);
+  };
+
   async function toggle(member: Profile) {
     if (!supabase) return;
     const { error: updateError } = await supabase
@@ -1366,9 +1767,93 @@ function UserManagement() {
         ),
       );
   }
+
+  async function saveMember() {
+    if (!supabase) return;
+
+    const payload = {
+      full_name: form.full_name.trim(),
+      email: form.email.trim(),
+      role: form.role,
+      is_active: form.is_active,
+    };
+
+    if (!payload.full_name || !payload.email) return;
+
+    if (editingMember) {
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update(payload)
+        .eq("id", editingMember.id);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      setMembers((current) =>
+        current.map((member) =>
+          member.id === editingMember.id ? { ...member, ...payload } : member,
+        ),
+      );
+    } else {
+      const { error: insertError } = await supabase.from("profiles").insert({
+        id: form.auth_id,
+        ...payload,
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+        return;
+      }
+
+      setMembers((current) => [
+        {
+          id: form.auth_id,
+          ...payload,
+          last_login_at: null,
+        },
+        ...current,
+      ]);
+    }
+
+    setShowForm(false);
+    setEditingMember(null);
+    resetForm();
+  }
+
+  async function deleteMember(member: Profile) {
+    if (!supabase) return;
+    const confirmed = window.confirm(
+      `Remove ${member.full_name} from the app? This removes their system profile only.`,
+    );
+    if (!confirmed) return;
+
+    const { error: deleteError } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", member.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setMembers((current) => current.filter((item) => item.id !== member.id));
+  }
+
   return (
     <section className="panel">
-      <div className="panel-title">Staff Directory</div>
+      <div className="panel-title">
+        Staff Directory{" "}
+        <button
+          type="button"
+          className="classic-button primary"
+          onClick={openAddUser}
+        >
+          + Add User
+        </button>
+      </div>
       <div className="filter-row">
         <label>
           Search{" "}
@@ -1397,7 +1882,7 @@ function UserManagement() {
             <tbody>
               {members
                 .filter((member) =>
-                  `${member.full_name} ${member.email}`
+                  `${member.full_name} ${member.email} ${member.role}`
                     .toLowerCase()
                     .includes(filter.toLowerCase()),
                 )
@@ -1415,13 +1900,29 @@ function UserManagement() {
                     </td>
                     <td>{member.last_login_at ?? "Never"}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="classic-button"
-                        onClick={() => toggle(member)}
-                      >
-                        {member.is_active ? "Deactivate" : "Activate"}
-                      </button>
+                      <div className="dialog-actions">
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={() => openEditUser(member)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={() => toggle(member)}
+                        >
+                          {member.is_active ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={() => deleteMember(member)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1430,6 +1931,102 @@ function UserManagement() {
           {!members.length && (
             <div className="empty-state">No staff profiles found.</div>
           )}
+        </div>
+      )}
+      {showForm && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              {editingMember ? "Edit User" : "Add User"}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingMember(null);
+                  resetForm();
+                }}
+              >
+                X
+              </button>
+            </div>
+            <div className="dialog-body">
+              {!editingMember && (
+                <label>
+                  Auth user UUID
+                  <input
+                    value={form.auth_id}
+                    onChange={(event) =>
+                      setForm({ ...form, auth_id: event.target.value })
+                    }
+                    placeholder="UUID from Supabase Auth"
+                  />
+                </label>
+              )}
+              <label>
+                Full name
+                <input
+                  value={form.full_name}
+                  onChange={(event) =>
+                    setForm({ ...form, full_name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
+                />
+              </label>
+              <label>
+                Role
+                <select
+                  value={form.role}
+                  onChange={(event) =>
+                    setForm({ ...form, role: event.target.value })
+                  }
+                >
+                  <option value="admin">Admin</option>
+                  <option value="dentist">Dentist</option>
+                  <option value="receptionist">Receptionist</option>
+                </select>
+              </label>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(event) =>
+                    setForm({ ...form, is_active: event.target.checked })
+                  }
+                />
+                Active user access
+              </label>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingMember(null);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={
+                    (!editingMember && !form.auth_id) || !form.full_name || !form.email
+                  }
+                  onClick={saveMember}
+                >
+                  {editingMember ? "Save Changes" : "Add User"}
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </section>
