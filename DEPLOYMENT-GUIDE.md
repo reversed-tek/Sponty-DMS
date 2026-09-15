@@ -48,7 +48,7 @@ The schema creates:
 https://<project-ref>.supabase.co/auth/v1/callback
 ```
 
-5. Add delegated Microsoft Graph permissions `openid`, `profile`, `email`, `User.Read`, and `Mail.Send` as required by the tenant.
+5. Add delegated Microsoft Graph permissions `openid`, `profile`, `email`, `User.Read`, `Mail.Send`, and `Calendars.ReadWrite` as required by the tenant. Add `offline_access` if the tenant requires explicit refresh-token consent.
 6. Grant admin consent if the tenant requires it.
 
 The application does not need a client secret in the browser for Supabase Auth's Azure provider flow.
@@ -62,7 +62,7 @@ Set:
 - **Client ID**: the Entra Application (client) ID
 - **Client secret**: the secret generated in Entra for the Supabase provider
 - **Tenant URL**: `https://login.microsoftonline.com/<tenant-id>`
-- **Scopes**: `email profile openid User.Read`
+- **Scopes**: `email profile openid User.Read Mail.Send Calendars.ReadWrite offline_access`
 
 Create the Entra client secret under **App registrations > Certificates & secrets**. Store it only in Supabase provider settings. Never put it in frontend code or commit it to the repository.
 
@@ -254,7 +254,7 @@ For optional Microsoft Graph calendar sync:
 3. Add delegated `Calendars.ReadWrite` permission to the Entra application for calendar sync.
 4. Add delegated `Mail.Send` permission to the Entra application for invoice emails.
 5. Grant tenant consent if required.
-6. Request `Mail.Send` during Supabase Azure sign-in. Existing users must sign in again to grant the new permission.
+6. Request `Mail.Send` and `Calendars.ReadWrite` during Supabase Azure sign-in. Existing users must sign in again and accept the consent prompt to grant the new permissions.
 7. The invoice email action uses the Supabase session's Microsoft provider token and calls `POST https://graph.microsoft.com/v1.0/me/sendMail`.
 8. Because the endpoint is `/me/sendMail`, the message is sent from the logged-in user's Outlook mailbox and saved to their Sent Items.
 9. If Graph send fails, keep the invoice unchanged and show a retryable error.

@@ -13,8 +13,9 @@ export async function signInWithMicrosoft() {
   return supabase.auth.signInWithOAuth({
     provider: 'azure',
     options: {
-      scopes: 'openid profile email User.Read Mail.Send Calendars.ReadWrite',
+      scopes: 'openid profile email User.Read Mail.Send Calendars.ReadWrite offline_access',
       redirectTo: `${appUrl}/auth/callback`,
+      queryParams: { prompt: 'consent' },
     },
   })
 }
