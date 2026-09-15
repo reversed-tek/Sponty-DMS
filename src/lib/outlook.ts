@@ -89,3 +89,94 @@ export async function sendInvoiceEmail(invoice: InvoiceEmail) {
     throw new Error(`Outlook could not send the invoice email (${response.status}). ${detail}`)
   }
 }
+
+export type WaitlistBroadcast = {
+  recipients: string[]
+  slotId: string
+  patientId: string
+  claimToken: string
+  appUrl: string
+  appointmentType: string
+  appointmentDate: string
+  appointmentTime: string
+  durationMinutes: number
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  })[character] ?? character)
+}
+
+export async function sendWaitlistBroadcastEmail(broadcast: WaitlistBroadcast) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  if (!broadcast.recipients.length) throw new Error('At least one waitlist recipient is required.')
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const providerToken = sessionData.session?.provider_token
+  if (!providerToken) throw new Error('Microsoft email access is not available. Sign in again and grant Mail.Send permission.')
+
+  const claimUrl = new URL('/claim-slot', broadcast.appUrl)
+  claimUrl.searchParams.set('slot_id', broadcast.slotId)
+  claimUrl.searchParams.set('patient_id', broadcast.patientId)
+  claimUrl.searchParams.set('token', broadcast.claimToken)
+  const safeUrl = escapeHtml(claimUrl.toString())
+  const safeType = escapeHtml(broadcast.appointmentType)
+  const safeDate = escapeHtml(broadcast.appointmentDate)
+  const safeTime = escapeHtml(broadcast.appointmentTime)
+
+  const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${providerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        subject: `Appointment opening: ${broadcast.appointmentType}`,
+        body: {
+          contentType: 'HTML',
+          content: `<p>An appointment has opened for <strong>${safeType}</strong> on ${safeDate} at ${safeTime}.</p><p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#0078d4;color:#ffffff;text-decoration:none;border:2px solid #005a9e;">Claim appointment</a></p><p>This link expires when the waitlist claim window closes or another patient claims the slot.</p>`,
+        },
+        toRecipients: broadcast.recipients.map((address) => ({ emailAddress: { address } })),
+      },
+      saveToSentItems: true,
+    }),
+  })
+  if (!response.ok) throw new Error(`Outlook could not send the waitlist email (${response.status}). ${await response.text()}`)
+}
+
+export type BookedWaitlistAppointment = {
+  id: string
+  patientName: string
+  appointmentType: string
+  appointmentDate: string
+  appointmentTime: string
+  durationMinutes: number
+  outlookEventId?: string | null
+}
+
+export async function syncBookedWaitlistCalendarEvent(appointment: BookedWaitlistAppointment) {
+  const token = await getProviderToken()
+  const start = new Date(`${appointment.appointmentDate}T${to24HourTime(appointment.appointmentTime)}:00`)
+  const end = new Date(start.getTime() + appointment.durationMinutes * 60_000)
+  const event = {
+    subject: `${appointment.appointmentType} - ${appointment.patientName}`,
+    body: { contentType: 'text', content: `Patient: ${appointment.patientName}\nBooked from waitlist.` },
+    start: { dateTime: start.toISOString(), timeZone: 'UTC' },
+    end: { dateTime: end.toISOString(), timeZone: 'UTC' },
+    showAs: 'busy',
+  }
+  const endpoint = appointment.outlookEventId
+    ? `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(appointment.outlookEventId)}`
+    : 'https://graph.microsoft.com/v1.0/me/events'
+  const response = await fetch(endpoint, {
+    method: appointment.outlookEventId ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+  })
+  if (!response.ok) throw new Error(`Outlook could not sync the booked appointment (${response.status}).`)
+  if (response.status === 204) return { id: appointment.outlookEventId ?? appointment.id }
+  return response.json() as Promise<{ id: string; webLink?: string }>
+}

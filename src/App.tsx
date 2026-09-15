@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
 import { createCalendarEvent, sendInvoiceEmail } from "./lib/outlook";
+import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
 
 type Page =
   | "Dashboard"
@@ -116,6 +117,9 @@ function App() {
   }, [sessionUser]);
 
   if (authLoading) return <div className="auth-screen">Loading session...</div>;
+  if (window.location.pathname === "/claim-slot") {
+    return <WaitlistClaimWindow sessionUser={sessionUser ? { id: sessionUser.id } : null} />;
+  }
   if (!sessionUser || !profile?.is_active)
     return (
       <div className="auth-screen">

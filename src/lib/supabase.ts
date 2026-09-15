@@ -22,3 +22,68 @@ export async function signInWithMicrosoft() {
 export async function signOut() {
   if (supabase) await supabase.auth.signOut()
 }
+
+export type WaitlistClaimedAppointment = {
+  id: string
+  patient_id: string
+  provider_id: string | null
+  appointment_date: string
+  appointment_time: string
+  duration_minutes: number
+  appointment_type: string
+  status: string
+  outlook_event_id: string | null
+}
+
+function requireSupabase() {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  return supabase
+}
+
+export async function createWaitlistClaim(
+  slotId: string,
+  patientId: string,
+  expiresAt?: string,
+) {
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('create_waitlist_claim', {
+    p_slot_id: slotId,
+    p_patient_id: patientId,
+    ...(expiresAt ? { p_expires_at: expiresAt } : {}),
+  })
+  if (error) throw new Error(`Could not create waitlist claim: ${error.message}`)
+  return data as string
+}
+
+export async function validateWaitlistClaim(
+  slotId: string,
+  patientId: string,
+  token: string,
+) {
+  if (!slotId || !patientId || !token) return false
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('validate_waitlist_claim', {
+    p_slot_id: slotId,
+    p_patient_id: patientId,
+    p_token: token,
+  })
+  if (error) throw new Error(`Could not validate waitlist claim: ${error.message}`)
+  return data === true
+}
+
+export async function claimWaitlistSlot(
+  slotId: string,
+  patientId: string,
+  token: string,
+) {
+  const valid = await validateWaitlistClaim(slotId, patientId, token)
+  if (!valid) throw new Error('This waitlist link is invalid, expired, or already used.')
+
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('claim_waitlist_slot', {
+    p_slot_id: slotId,
+    p_patient_id: patientId,
+  })
+  if (error) throw new Error(error.message)
+  return data as WaitlistClaimedAppointment
+}
