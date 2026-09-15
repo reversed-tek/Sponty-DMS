@@ -258,6 +258,112 @@ For optional Microsoft Graph calendar sync:
 7. The invoice email action uses the Supabase session's Microsoft provider token and calls `POST https://graph.microsoft.com/v1.0/me/sendMail`.
 8. Because the endpoint is `/me/sendMail`, the message is sent from the logged-in user's Outlook mailbox and saved to their Sent Items.
 9. If Graph send fails, keep the invoice unchanged and show a retryable error.
+
+## 13. Deploy the Patient Portal Database Changes
+
+The patient portal is a passwordless flow. A staff member issues a one-time access token, the patient opens `/portal/<token>`, and Supabase exchanges that token for a short-lived portal session. The original token is consumed once and is never stored in browser storage.
+
+Run the migrations in this order from the Supabase SQL Editor:
+
+1. [`supabase/migrations/20260915000000_waitlist_slot_prerequisites.sql`](supabase/migrations/20260915000000_waitlist_slot_prerequisites.sql)
+2. [`supabase/migrations/20260915000001_waitlist_claiming.sql`](supabase/migrations/20260915000001_waitlist_claiming.sql)
+3. [`supabase/migrations/20260915000002_patient_portal.sql`](supabase/migrations/20260915000002_patient_portal.sql)
+
+The patient portal migration creates:
+
+- `access_tokens` for expiring one-time links
+- `portal_sessions` for 30-minute derived sessions
+- `payment_proofs` and `patient_documents` metadata
+- `payment-proofs` and `patient-documents` private Storage buckets
+- RPCs for issuing, consuming, and validating portal sessions
+- RPCs for reading patient invoices and marking a receipt as pending verification
+- Bank detail fields on `practice_settings`
+
+After running the migration, configure the clinic bank details:
+
+```sql
+update public.practice_settings
+set bank_name = 'Example Bank',
+    bank_account_name = 'Sponty Dental Services',
+    bank_account_number = 'ACCOUNT-NUMBER',
+    portal_staff_email = 'clinic@example.com'
+where id = true;
+```
+
+Do not make either Storage bucket public. Patient uploads are validated by the `patient-portal-upload` Edge Function using the short-lived portal session.
+
+## 14. Issue a Patient Portal Link
+
+Only an authenticated staff user with an active profile may issue a link. The frontend helper is `issue_patient_portal_token` through Supabase RPC. The returned token should be sent using [`sendPatientPortalAccessEmail`](src/lib/outlook.ts).
+
+For a controlled SQL test, use the Supabase dashboard while signed in as staff or call the application helper:
+
+```ts
+const { data: token, error } = await supabase.rpc('issue_patient_portal_token', {
+  p_patient_id: patientId,
+})
+```
+
+The production link format is:
+
+```text
+https://app.example.com/portal/<ONE_TIME_TOKEN>
+```
+
+The token expires after 24 hours by default. Once consumed, it cannot be used again. A refresh remains possible for 30 minutes because the app keeps only the derived session in `sessionStorage`.
+
+## 15. Deploy the Patient Upload Edge Function
+
+Install and authenticate the Supabase CLI, then link the project:
+
+```bash
+supabase login
+supabase link --project-ref <project-ref>
+supabase functions deploy patient-portal-upload
+```
+
+The function uses the Supabase service-role key only inside the Edge Function runtime. Never put that key in `.env.local`, Vercel variables prefixed with `VITE_`, or browser code.
+
+Set the Edge Function secrets:
+
+```bash
+supabase secrets set \
+  MICROSOFT_TENANT_ID=<tenant-id> \
+  MICROSOFT_CLIENT_ID=<application-client-id> \
+  MICROSOFT_CLIENT_SECRET=<application-secret> \
+  MICROSOFT_GRAPH_SENDER=clinic-mailbox@example.com \
+  PORTAL_STAFF_EMAILS=staff-one@example.com,staff-two@example.com
+```
+
+The first three Graph secrets are used for server-side staff notification after a payment receipt upload. `MICROSOFT_GRAPH_SENDER` must be a mailbox the application is allowed to send as. `PORTAL_STAFF_EMAILS` is a comma-separated recipient list.
+
+## 16. Microsoft Graph Permissions for Portal Notifications
+
+The Edge Function uses the OAuth 2.0 client-credentials flow. In the Entra app registration:
+
+1. Add Microsoft Graph **Application** permission `Mail.Send`.
+2. Grant admin consent for the tenant.
+3. Create a client secret and store it only as the Edge Function secret above.
+4. Restrict the application mailbox with an Exchange application access policy if the tenant requires limited send-as scope.
+
+The existing browser-based invoice and calendar features continue to use delegated permissions through Supabase Azure Auth. The Edge Function notification uses application permissions because a patient portal visitor does not have a staff delegated token.
+
+## 17. Patient Portal Deployment Smoke Test
+
+Run these checks after deployment:
+
+1. Staff issues a portal token for an active patient.
+2. The patient opens `/portal/<token>` in a private browser window.
+3. Confirm the patient name and only that patient’s invoices are displayed.
+4. Confirm the bank name, account name, account number, and reference code are shown.
+5. Upload a PNG, JPG, or PDF payment receipt and confirm the invoice changes to `pending_verification`.
+6. Confirm the receipt appears in the private `payment-proofs` bucket and staff receives the verification email.
+7. Upload an X-ray or medical record through the drag-and-drop panel.
+8. Confirm the file is stored under the patient folder in the private `patient-documents` bucket.
+9. Open the original link again and confirm it is rejected as consumed.
+10. Wait for or simulate session expiry and confirm the portal asks for a new link.
+
+Do not test by making the buckets public. A successful portal upload should work while unauthenticated in Supabase Auth, because authorization comes from the one-time portal session validated by the Edge Function.
 10. Calendar sync can continue to use the same signed-in provider token for calendar operations.
 
 Calendar sync must never be the only persistence path for an appointment.
