@@ -147,6 +147,40 @@ export async function sendWaitlistBroadcastEmail(broadcast: WaitlistBroadcast) {
   if (!response.ok) throw new Error(`Outlook could not send the waitlist email (${response.status}). ${await response.text()}`)
 }
 
+export async function sendPaymentProofNotification(invoiceNumber: string, patientName: string, staffRecipients: string[]) {
+  if (!supabase || !staffRecipients.length) throw new Error('Supabase and at least one staff recipient are required.')
+  const { data } = await supabase.auth.getSession()
+  const providerToken = data.session?.provider_token
+  if (!providerToken) throw new Error('Microsoft email access is not available. Sign in again and grant Mail.Send permission.')
+  const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${providerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        subject: 'New Bank Transfer Receipt Uploaded for Verification',
+        body: { contentType: 'HTML', content: `<p>A new bank transfer receipt was uploaded for verification.</p><p><strong>Patient:</strong> ${escapeHtml(patientName)}<br><strong>Invoice:</strong> ${escapeHtml(invoiceNumber)}</p>` },
+        toRecipients: staffRecipients.map((address) => ({ emailAddress: { address } })),
+      },
+      saveToSentItems: true,
+    }),
+  })
+  if (!response.ok) throw new Error(`Outlook could not notify staff (${response.status}).`)
+}
+
+export async function sendPatientPortalAccessEmail(recipient: string, patientName: string, token: string, appUrl: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { data } = await supabase.auth.getSession()
+  const providerToken = data.session?.provider_token
+  if (!providerToken) throw new Error('Microsoft email access is not available. Sign in again and grant Mail.Send permission.')
+  const portalUrl = `${appUrl.replace(/\/$/, '')}/portal/${encodeURIComponent(token)}`
+  const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${providerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { subject: 'Your Sponty Dental Services patient portal', body: { contentType: 'HTML', content: `<p>Hello ${escapeHtml(patientName)},</p><p>Use the secure link below to view invoices, payment instructions, and share documents with the clinic.</p><p><a href="${escapeHtml(portalUrl)}" style="display:inline-block;padding:10px 16px;background:#0078d4;color:#fff;text-decoration:none;">Open patient portal</a></p><p>This one-time link expires in 24 hours.</p>` }, toRecipients: [{ emailAddress: { address: recipient } }] }, saveToSentItems: true }),
+  })
+  if (!response.ok) throw new Error(`Outlook could not send the patient portal email (${response.status}).`)
+}
+
 export type BookedWaitlistAppointment = {
   id: string
   patientName: string

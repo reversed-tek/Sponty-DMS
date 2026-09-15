@@ -3,6 +3,7 @@ import "./App.css";
 import { signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
 import { createCalendarEvent, sendInvoiceEmail } from "./lib/outlook";
 import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
+import { PatientPortal } from "./components/PatientPortal";
 
 type Page =
   | "Dashboard"
@@ -117,6 +118,8 @@ function App() {
   }, [sessionUser]);
 
   if (authLoading) return <div className="auth-screen">Loading session...</div>;
+  const portalMatch = window.location.pathname.match(/^\/portal\/([^/]+)$/);
+  if (portalMatch) return <PatientPortal token={decodeURIComponent(portalMatch[1])} />;
   if (window.location.pathname === "/claim-slot") {
     return <WaitlistClaimWindow sessionUser={sessionUser ? { id: sessionUser.id } : null} />;
   }

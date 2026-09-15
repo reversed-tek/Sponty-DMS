@@ -87,3 +87,52 @@ export async function claimWaitlistSlot(
   if (error) throw new Error(error.message)
   return data as WaitlistClaimedAppointment
 }
+
+export type PortalInvoice = {
+  id: string
+  invoice_number: string
+  invoice_date: string
+  total: number
+  amount_paid: number
+  balance: number
+  status: string
+}
+
+export type PortalContext = {
+  session_token: string
+  patient_id: string
+  patient_name: string
+  expires_at: string
+}
+
+export async function consumePatientPortalToken(token: string) {
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('consume_patient_portal_token', { p_token: token })
+  if (error) throw new Error('This portal link is invalid, expired, or already used.')
+  return data as PortalContext
+}
+
+export async function getPatientPortalData(sessionToken: string) {
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('get_patient_portal_data', { p_session_token: sessionToken })
+  if (error) throw new Error('This portal session has expired. Request a new link.')
+  return data as { patient_id: string; patient_name: string; invoices: PortalInvoice[]; documents: Array<{ id: string; file_name: string; content_type: string; storage_path: string; uploaded_at: string }>; bank: { bank_name: string | null; account_name: string | null; account_number: string | null } | null }
+}
+
+export async function uploadPatientPortalFile(
+  sessionToken: string,
+  bucket: 'payment-proofs' | 'patient-documents',
+  file: File,
+  invoiceId?: string,
+) {
+  const client = requireSupabase()
+  const form = new FormData()
+  form.append('session_token', sessionToken)
+  form.append('bucket', bucket)
+  form.append('file', file)
+  if (invoiceId) form.append('invoice_id', invoiceId)
+  const { data, error } = await client.functions.invoke('patient-portal-upload', { body: form })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  return data as { path: string; file_name: string }
+}
