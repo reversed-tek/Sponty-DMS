@@ -41,7 +41,17 @@ export function PatientPortal({ token }: PatientPortalProps) {
   const refresh = async (sessionToken: string) => setData(await getPatientPortalData(sessionToken));
   useEffect(() => {
     let active = true;
-    (async () => { try { const nextContext = await consumePatientPortalToken(token); const nextData = await getPatientPortalData(nextContext.session_token); if (active) { setContext(nextContext); setData(nextData); } } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "Portal link is invalid or expired."); } finally { if (active) setLoading(false); } })();
+    (async () => {
+      try {
+        const storageKey = `sponty-portal-session:${token}`;
+        const stored = sessionStorage.getItem(storageKey);
+        const nextContext = stored ? JSON.parse(stored) as PortalContext : await consumePatientPortalToken(token);
+        const nextData = await getPatientPortalData(nextContext.session_token);
+        sessionStorage.setItem(storageKey, JSON.stringify(nextContext));
+        if (active) { setContext(nextContext); setData(nextData); }
+      } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "Portal link is invalid or expired."); }
+      finally { if (active) setLoading(false); }
+    })();
     return () => { active = false; };
   }, [token]);
 
