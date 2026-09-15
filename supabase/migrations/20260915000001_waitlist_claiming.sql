@@ -1,6 +1,8 @@
 -- One-click waitlist claiming RPCs and RLS policies.
 -- Run after 20260915000000_waitlist_slot_prerequisites.sql.
 
+create extension if not exists pgcrypto;
+
 create table if not exists public.waitlist_claims (
   id uuid primary key default gen_random_uuid(),
   slot_id uuid not null references public.appointments(id) on delete cascade,
@@ -17,6 +19,7 @@ create index if not exists waitlist_claims_slot_idx
 
 alter table public.waitlist_claims enable row level security;
 
+drop policy if exists waitlist_claims_staff_access on public.waitlist_claims;
 create policy waitlist_claims_staff_access
   on public.waitlist_claims for all to authenticated
   using (public.current_user_role() in ('admin', 'dentist', 'receptionist'))
@@ -46,9 +49,9 @@ begin
     raise exception 'slot_not_open';
   end if;
 
-  raw_token := encode(gen_random_bytes(32), 'hex');
+  raw_token := encode(extensions.gen_random_bytes(32), 'hex');
   insert into public.waitlist_claims (slot_id, patient_id, token_hash, expires_at, created_by)
-  values (p_slot_id, p_patient_id, encode(digest(raw_token, 'sha256'), 'hex'), p_expires_at, auth.uid());
+  values (p_slot_id, p_patient_id, encode(extensions.digest(raw_token, 'sha256'), 'hex'), p_expires_at, auth.uid());
   return raw_token;
 end;
 $$;
@@ -70,7 +73,7 @@ as $$
     from public.waitlist_claims
     where slot_id = p_slot_id
       and patient_id = p_patient_id
-      and token_hash = encode(digest(p_token, 'sha256'), 'hex')
+      and token_hash = encode(extensions.digest(p_token, 'sha256'), 'hex')
       and expires_at > now()
       and claimed_at is null
   );
