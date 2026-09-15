@@ -247,13 +247,6 @@ function App() {
               <div className="breadcrumbs">Practice / {page}</div>
               <h1>{page}</h1>
             </div>
-            <button
-              type="button"
-              className="classic-button"
-              onClick={() => window.print()}
-            >
-              Print
-            </button>
           </div>
           {page === "Dashboard" && <Dashboard navigate={navigate} />}
           {page === "Patients" && (
@@ -555,13 +548,6 @@ function Patients({
             Search{" "}
             <input value={search} readOnly placeholder="Use Quick Find above" />
           </label>
-          <button
-            type="button"
-            className="classic-button"
-            onClick={() => window.print()}
-          >
-            Print
-          </button>
         </div>
         {error && <p className="send-error">{error}</p>}
         {loading ? (
@@ -1080,7 +1066,7 @@ function DentalChart({
             {patient.first_name} {patient.last_name} | FDI notation
           </span>
         </div>
-        <div className="dental-toolbar"><button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ Record condition</button><button type="button" className="classic-button" onClick={() => window.print()}>Print chart</button></div>
+        <div className="dental-toolbar"><button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ Record condition</button></div>
         {error && <p className="send-error">{error}</p>}
         <div className="tooth-grid">
           {toothNumbers.map((number) => (
