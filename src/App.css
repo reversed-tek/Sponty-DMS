@@ -30,3 +30,14 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .tab.active { background: #e8ebee; border-bottom-color: #e8ebee; }
 .action-row { background: #e8ebee; border-color: #fff #909aa5 #909aa5 #fff; }
 .action-row:hover { background: #c8e2f8; }
+
+.sidebar nav { display: grid; gap: 3px; }
+.nav-item { position: relative; min-height: 31px; padding: 5px 8px 5px 12px; border-left: 4px solid transparent; border-bottom: 1px solid #c5d0dc; background: rgba(255, 255, 255, 0.28); }
+.nav-item:hover, .nav-item:focus-visible { color: var(--navy-text); background: #c8e2f8; border-left-color: #68aee3; }
+.nav-item.active { color: #fff; background: var(--brand-blue); border-left-color: var(--brand-blue-dark); font-weight: bold; }
+.sidebar-section { margin-top: 18px; padding: 7px 5px 5px; color: var(--brand-blue-dark); border-top: 2px solid #b8c6d5; font-size: 11px; letter-spacing: 0.3px; text-transform: uppercase; }
+.sidebar > .nav-item { margin-bottom: 3px; }
+.sidebar-note { border-color: #b8cce2; background: #dcecff; }
+.toolbar { justify-content: flex-end; }
+.quick-search { margin-left: 0; }
+.status-bar { justify-content: flex-start; }

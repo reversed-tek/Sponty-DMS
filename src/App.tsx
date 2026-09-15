@@ -190,21 +190,6 @@ function App() {
         <button type="button" onClick={() => setNotice("Use the sidebar to open a module")}>Help</button>
       </div>
       <div className="toolbar">
-        <button
-          type="button"
-          className="toolbar-button"
-          onClick={() => navigate("Patients")}
-        >
-          Patients
-        </button>
-        <button
-          type="button"
-          className="toolbar-button"
-          onClick={() => navigate("Appointments")}
-        >
-          [ ] Schedule
-        </button>
-        <span className="toolbar-divider" />
         <label className="quick-search">
           Quick Find:{" "}
           <input
@@ -213,7 +198,6 @@ function App() {
             placeholder="patient name or number"
           />
         </label>
-        <span className="signed-in">{profile.full_name}</span>
       </div>
       <div className="workspace">
         <aside className="sidebar">
@@ -298,9 +282,6 @@ function App() {
       </div>
       <footer className="status-bar">
         <span className="status-panel">{notice}</span>
-        <span className="status-panel status-right">
-          {roleLabel(profile.role)} | Database connected
-        </span>
       </footer>
     </div>
   );
