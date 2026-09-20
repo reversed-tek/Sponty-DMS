@@ -892,20 +892,40 @@ function Patients({
       if (!auth.user) throw new Error("Your user session is not available.");
 
       const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
-      const { error: invoiceError } = await supabase.from("invoices").insert({
-        invoice_number: invoiceNumber,
-        patient_id: appointment.patient_id,
-        appointment_id: appointmentId,
-        subtotal,
-        total: subtotal,
-        balance: subtotal,
-        amount_paid: 0,
-        status: "pending",
-        notes: `Auto-generated from appointment ${appointmentId}`,
-        created_by: auth.user.id,
-      });
+      const { data: createdInvoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .insert({
+          invoice_number: invoiceNumber,
+          patient_id: appointment.patient_id,
+          appointment_id: appointmentId,
+          subtotal,
+          total: subtotal,
+          balance: subtotal,
+          amount_paid: 0,
+          status: "pending",
+          notes: `Auto-generated from appointment ${appointmentId}`,
+          created_by: auth.user.id,
+        })
+        .select("id")
+        .single();
 
       if (invoiceError) throw invoiceError;
+      if (!createdInvoice) throw new Error("Invoice could not be created.");
+
+      const invoiceItems = treatmentRows.map((row) => ({
+        invoice_id: createdInvoice.id,
+        treatment_id: null,
+        description: row.procedure_name,
+        quantity: 1,
+        unit_price: Number(row.cost ?? 0),
+        total: Number(row.cost ?? 0),
+      }));
+
+      const { error: itemError } = await supabase
+        .from("invoice_items")
+        .insert(invoiceItems);
+
+      if (itemError) throw itemError;
 
       const { error: statusError } = await supabase
         .from("appointments")
@@ -2047,11 +2067,16 @@ function Billing({ patient }: { patient: Patient | null }) {
   const [emailInvoice, setEmailInvoice] = useState<
     (typeof items)[number] | null
   >(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<
+    (typeof items)[number] | null
+  >(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
-  useEffect(() => {
+
+  function refreshInvoiceList() {
     if (!supabase) return;
     supabase
       .from("invoices")
@@ -2062,22 +2087,27 @@ function Billing({ patient }: { patient: Patient | null }) {
       .then(({ data }) =>
         setItems(
           (data ?? []).map((item) => {
-            const patient = item.patients as unknown as {
+            const patientData = item.patients as unknown as {
               first_name: string;
               last_name: string;
               email: string | null;
             } | null;
             return {
               ...item,
-              patient: patient
-                ? `${patient.first_name} ${patient.last_name}`
+              patient: patientData
+                ? `${patientData.first_name} ${patientData.last_name}`
                 : "Unknown patient",
-              email: patient?.email ?? "",
+              email: patientData?.email ?? "",
             };
           }),
         ),
       );
+  }
+
+  useEffect(() => {
+    refreshInvoiceList();
   }, []);
+
   async function sendInvoice() {
     if (!emailInvoice) return;
     try {
@@ -2096,6 +2126,43 @@ function Billing({ patient }: { patient: Patient | null }) {
       );
     }
   }
+
+  async function recordPayment() {
+    if (!supabase || !paymentInvoice || !paymentAmount) return;
+
+    const amount = Number(paymentAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      setMessage("Enter a valid payment amount.");
+      return;
+    }
+
+    const nextPaid = Math.min(
+      Number(paymentInvoice.amount_paid) + amount,
+      Number(paymentInvoice.total),
+    );
+    const nextBalance = Math.max(Number(paymentInvoice.total) - nextPaid, 0);
+    const nextStatus = nextBalance > 0 ? "partial" : "paid";
+
+    const { error } = await supabase
+      .from("invoices")
+      .update({
+        amount_paid: nextPaid,
+        balance: nextBalance,
+        status: nextStatus,
+      })
+      .eq("id", paymentInvoice.id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setPaymentInvoice(null);
+    setPaymentAmount("");
+    setMessage("Payment recorded.");
+    refreshInvoiceList();
+  }
+
   async function addInvoice() {
     if (!supabase || !patient || !form.total) return;
     const { data: auth } = await supabase.auth.getUser();
@@ -2118,7 +2185,7 @@ function Billing({ patient }: { patient: Patient | null }) {
               <th>Total</th>
               <th>Balance</th>
               <th>Status</th>
-              <th>Email</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -2133,17 +2200,30 @@ function Billing({ patient }: { patient: Patient | null }) {
                   <span className="status-badge">{item.status}</span>
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="classic-button"
-                    onClick={() => {
-                      setEmailInvoice(item);
-                      setRecipient(item.email);
-                      setMessage("");
-                    }}
-                  >
-                    Send email
-                  </button>
+                  <div className="dialog-actions">
+                    <button
+                      type="button"
+                      className="classic-button"
+                      onClick={() => {
+                        setEmailInvoice(item);
+                        setRecipient(item.email);
+                        setMessage("");
+                      }}
+                    >
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      className="classic-button primary"
+                      onClick={() => {
+                        setPaymentInvoice(item);
+                        setPaymentAmount("");
+                        setMessage("");
+                      }}
+                    >
+                      Receive payment
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -2189,6 +2269,51 @@ function Billing({ patient }: { patient: Patient | null }) {
                   onClick={sendInvoice}
                 >
                   Send invoice
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+      {paymentInvoice && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              Receive payment for {paymentInvoice.invoice_number}{" "}
+              <button type="button" onClick={() => setPaymentInvoice(null)}>
+                X
+              </button>
+            </div>
+            <div className="dialog-body">
+              <p>
+                Total: {formatCurrency(Number(paymentInvoice.total))} · Balance: {formatCurrency(Number(paymentInvoice.balance))}
+              </p>
+              <label>
+                Payment amount
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(event) => setPaymentAmount(event.target.value)}
+                />
+              </label>
+              {message && <p className="send-success">{message}</p>}
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => setPaymentInvoice(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={!paymentAmount}
+                  onClick={recordPayment}
+                >
+                  Save payment
                 </button>
               </div>
             </div>
