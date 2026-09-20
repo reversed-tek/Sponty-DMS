@@ -18,6 +18,7 @@ type Page =
   | "Reports"
   | "User Management"
   | "Practice Settings";
+type CaseTab = "clinical" | "chart" | "history";
 type Patient = {
   id: string;
   patient_number: string;
@@ -472,8 +473,6 @@ function App() {
               selected={selectedPatient}
               setSelected={setSelectedPatient}
               setNotice={setNotice}
-              onCheckIn={checkInPatientAppointment}
-              onHandoverToDentist={handoverToDentist}
               onCompleteTreatment={completeTreatmentForAppointment}
             />
           )}
@@ -592,16 +591,12 @@ function Patients({
   selected,
   setSelected,
   setNotice,
-  onCheckIn,
-  onHandoverToDentist,
   onCompleteTreatment,
 }: {
   search: string;
   selected: Patient | null;
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
-  onCheckIn: (appointmentId: string) => void;
-  onHandoverToDentist: (appointmentId: string) => void;
   onCompleteTreatment: (appointmentId: string) => void;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -631,7 +626,7 @@ function Patients({
     notes: string | null;
     provider_name: string | null;
   } | null>(null);
-  const [caseTab, setCaseTab] = useState<"clinical" | "chart">("clinical");
+  const [caseTab, setCaseTab] = useState<CaseTab>("clinical");
   const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
@@ -687,7 +682,7 @@ function Patients({
 
         const next = (data ?? []).find(
           (appointment) =>
-            appointment.appointment_date >= new Date().toISOString().slice(0, 10),
+            appointment.status === "in_progress",
         );
 
         if (!next) {
@@ -1118,7 +1113,7 @@ function Patients({
                 </div>
               </div>
               {upcomingAppointment && (
-                <div className="checkin-card">
+                <div className="appointment-detail-card">
                   <div>
                     <span>Next appointment</span>
                     <strong>
@@ -1133,14 +1128,6 @@ function Patients({
                     <span className="status-badge">
                       {appointmentStatusLabel(upcomingAppointment.status)}
                     </span>
-                    <button
-                      type="button"
-                      className="classic-button primary"
-                      onClick={() => void onCheckIn(upcomingAppointment.id)}
-                      disabled={upcomingAppointment.status === "in_progress"}
-                    >
-                      {upcomingAppointment.status === "in_progress" ? "Ready for dentist" : "Check in"}
-                    </button>
                   </div>
                 </div>
               )}
@@ -1166,8 +1153,6 @@ function Patients({
               patient={selected}
               caseTab={caseTab}
               setCaseTab={setCaseTab}
-              onCheckIn={onCheckIn}
-              onHandoverToDentist={onHandoverToDentist}
               onCompleteTreatment={onCompleteTreatment}
               upcomingAppointment={upcomingAppointment}
               setNotice={setNotice}
@@ -1343,6 +1328,8 @@ function Appointments({
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "" });
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
+  const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
+  const completedAppointments = items.filter((item) => item.status === "completed");
   useEffect(() => {
     if (!supabase) return;
     supabase.from("patients").select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies").eq("is_active", true).order("last_name").then(({ data }) => setPatients(data ?? []));
@@ -1466,90 +1453,121 @@ function Appointments({
         <div className="empty-state">Loading appointments...</div>
       ) : (
         <div className="appointment-list">
-          {items.map((item) => (
-            <div className="appointment-row" key={item.id}>
-              <time>
-                {item.appointment_date} {item.appointment_time}
-              </time>
-              <div className="appointment-block">
-                <strong>{item.patient_name}</strong>
-                <span>
-                  {item.appointment_type} with {item.provider_name}
+          <div className="appointment-section">
+            <h3>Active appointments</h3>
+            {activeAppointments.map((item) => (
+              <div className="appointment-row" key={item.id}>
+                <time>
+                  {item.appointment_date} {item.appointment_time}
+                </time>
+                <div className="appointment-block">
+                  <strong>{item.patient_name}</strong>
+                  <span>
+                    {item.appointment_type} with {item.provider_name}
+                  </span>
+                </div>
+                <span className={`status-badge ${item.status}`}>
+                  {item.status}
                 </span>
-              </div>
-              <span className={`status-badge ${item.status}`}>
-                {item.status}
-              </span>
-              <span
-                className={
-                  item.outlook_event_id
-                    ? "calendar-sync synced"
-                    : "calendar-sync"
-                }
-              >
-                {item.outlook_event_id ? "Outlook synced" : "Local only"}
-              </span>
-              <div className="appointment-action-group">
-                <button
-                  type="button"
-                  className="classic-button"
-                  disabled={Boolean(item.outlook_event_id)}
-                  onClick={() => sync(item)}
-                >
-                  {item.outlook_event_id ? "Synced" : "Sync Outlook"}
-                </button>
-                <button
-                  type="button"
-                  className="classic-button"
-                  onClick={() => {
-                    setSelectedAppointmentId(item.id);
-                    setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
-                  }}
-                >
-                  Open
-                </button>
-                <button
-                  type="button"
-                  className="classic-button appointment-action-toggle"
-                  onClick={() =>
-                    setExpandedActionId((current) =>
-                      current === item.id ? null : item.id,
-                    )
+                <span
+                  className={
+                    item.outlook_event_id
+                      ? "calendar-sync synced"
+                      : "calendar-sync"
                   }
                 >
-                  {expandedActionId === item.id ? "Hide actions" : "Actions"}
-                </button>
-              </div>
-              {expandedActionId === item.id && (
-                <div className="appointment-clinic-actions">
+                  {item.outlook_event_id ? "Outlook synced" : "Local only"}
+                </span>
+                <div className="appointment-action-group">
                   <button
                     type="button"
-                    className="classic-button primary"
-                    onClick={() => onCheckIn(item.id)}
-                    disabled={item.status === "in_progress" || item.status === "completed"}
+                    className="classic-button"
+                    disabled={Boolean(item.outlook_event_id)}
+                    onClick={() => sync(item)}
                   >
-                    {item.status === "in_progress" ? "Ready for dentist" : "Check in"}
+                    {item.outlook_event_id ? "Synced" : "Sync Outlook"}
                   </button>
                   <button
                     type="button"
                     className="classic-button"
-                    onClick={() => onHandoverToDentist(item.id)}
-                    disabled={item.status === "completed"}
+                    onClick={() => {
+                      setSelectedAppointmentId(item.id);
+                      setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
+                    }}
                   >
-                    Handover
+                    Open
                   </button>
                   <button
                     type="button"
-                    className="classic-button primary"
-                    onClick={() => onCompleteTreatment(item.id)}
-                    disabled={item.status === "completed"}
+                    className="classic-button appointment-action-toggle"
+                    onClick={() =>
+                      setExpandedActionId((current) =>
+                        current === item.id ? null : item.id,
+                      )
+                    }
                   >
-                    Complete
+                    {expandedActionId === item.id ? "Hide actions" : "Actions"}
                   </button>
                 </div>
-              )}
+                {expandedActionId === item.id && (
+                  <div className="appointment-clinic-actions">
+                    <button
+                      type="button"
+                      className="classic-button"
+                      onClick={() => onHandoverToDentist(item.id)}
+                      disabled={item.status === "completed"}
+                    >
+                      Handover to dentist
+                    </button>
+                    <button
+                      type="button"
+                      className="classic-button primary"
+                      onClick={() => onCompleteTreatment(item.id)}
+                      disabled={item.status === "completed"}
+                    >
+                      Complete treatment
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {!activeAppointments.length && <div className="empty-state">No active appointments.</div>}
+          </div>
+
+          {completedAppointments.length > 0 && (
+            <div className="appointment-section appointment-section-completed">
+              <h3>Completed appointments</h3>
+              {completedAppointments.map((item) => (
+                <div className="appointment-row appointment-row-completed" key={item.id}>
+                  <time>
+                    {item.appointment_date} {item.appointment_time}
+                  </time>
+                  <div className="appointment-block">
+                    <strong>{item.patient_name}</strong>
+                    <span>
+                      {item.appointment_type} with {item.provider_name}
+                    </span>
+                  </div>
+                  <span className={`status-badge ${item.status}`}>
+                    {item.status}
+                  </span>
+                  <span className="calendar-sync synced">Invoice generated</span>
+                  <div className="appointment-action-group">
+                    <button
+                      type="button"
+                      className="classic-button"
+                      onClick={() => {
+                        setSelectedAppointmentId(item.id);
+                        setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
+                      }}
+                    >
+                      Open
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
@@ -1607,17 +1625,13 @@ function PatientCaseWorkspace({
   patient,
   caseTab,
   setCaseTab,
-  onCheckIn,
-  onHandoverToDentist,
   onCompleteTreatment,
   upcomingAppointment,
   setNotice,
 }: {
   patient: Patient | null;
-  caseTab: "clinical" | "chart";
-  setCaseTab: (value: "clinical" | "chart") => void;
-  onCheckIn: (appointmentId: string) => void;
-  onHandoverToDentist: (appointmentId: string) => void;
+  caseTab: CaseTab;
+  setCaseTab: (value: CaseTab) => void;
   onCompleteTreatment: (appointmentId: string) => void;
   upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; notes: string | null; provider_name: string | null } | null;
   setNotice: (message: string) => void;
@@ -1641,6 +1655,17 @@ function PatientCaseWorkspace({
       severity: string | null;
     }>
   >([]);
+  const [handoverHistory, setHandoverHistory] = useState<
+    Array<{
+      id: string;
+      appointment_date: string;
+      appointment_time: string;
+      appointment_type: string;
+      reason: string | null;
+      notes: string | null;
+      status: string;
+    }>
+  >([]);
 
   useEffect(() => {
     if (!supabase || !patient) return;
@@ -1656,9 +1681,28 @@ function PatientCaseWorkspace({
         .select("id, record_type, name, detail, severity")
         .eq("patient_id", patient.id)
         .order("created_at", { ascending: false }),
-    ]).then(([notesResult, historyResult]) => {
+      supabase
+        .from("appointments")
+        .select("id, appointment_date, appointment_time, appointment_type, status, reason, notes")
+        .eq("patient_id", patient.id)
+        .order("appointment_date", { ascending: false })
+        .order("appointment_time", { ascending: false }),
+    ]).then(([notesResult, historyResult, handoverResult]) => {
       setNotes(notesResult.data ?? []);
       setHistory(historyResult.data ?? []);
+      setHandoverHistory(
+        (handoverResult.data ?? [])
+          .filter((item) => item.status === "in_progress" || item.status === "completed")
+          .map((item) => ({
+            id: item.id,
+            appointment_date: item.appointment_date,
+            appointment_time: item.appointment_time,
+            appointment_type: item.appointment_type,
+            reason: item.reason,
+            notes: item.notes,
+            status: item.status,
+          })),
+      );
     });
   }, [patient]);
 
@@ -1671,13 +1715,14 @@ function PatientCaseWorkspace({
       <div className="tab-strip">
         {[
           { id: "clinical", label: "Clinical Records" },
+          { id: "history", label: "Handover History" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             className={caseTab === tab.id ? "tab active" : "tab"}
-            onClick={() => setCaseTab(tab.id as "clinical" | "chart")}
+            onClick={() => setCaseTab(tab.id as CaseTab)}
           >
             {tab.label}
           </button>
@@ -1690,19 +1735,13 @@ function PatientCaseWorkspace({
             {upcomingAppointment ? (
               <div className="case-appointment-box">
                 <div>
-                  <span>Appointment handover</span>
+                  <span>Appointment summary</span>
                   <strong>{upcomingAppointment.appointment_type}</strong>
                   <small>
                     {upcomingAppointment.appointment_date} · {upcomingAppointment.appointment_time}
                   </small>
                 </div>
                 <div className="case-action-stack">
-                  <button type="button" className="classic-button primary" onClick={() => onCheckIn(upcomingAppointment.id)} disabled={upcomingAppointment.status === "in_progress" || upcomingAppointment.status === "completed"}>
-                    {upcomingAppointment.status === "in_progress" || upcomingAppointment.status === "completed" ? "Checked in" : "Check in"}
-                  </button>
-                  <button type="button" className="classic-button" onClick={() => onHandoverToDentist(upcomingAppointment.id)} disabled={upcomingAppointment.status === "completed"}>
-                    Handover to dentist
-                  </button>
                   <button type="button" className="classic-button primary" onClick={() => onCompleteTreatment(upcomingAppointment.id)} disabled={upcomingAppointment.status === "completed"}>
                     Complete treatment
                   </button>
@@ -1764,6 +1803,29 @@ function PatientCaseWorkspace({
                 <div className="note-meta"><strong>System rule</strong></div>
                 <p>Appointments connect handover notes, clinical records, treatment, and invoice generation in one flow.</p>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : caseTab === "history" ? (
+        <div className="patient-case-body">
+          <div className="case-columns">
+            <div className="case-column" style={{ width: "100%" }}>
+              <h3>Handover history</h3>
+              {handoverHistory.length ? (
+                handoverHistory.map((entry) => (
+                  <article className="case-note" key={entry.id}>
+                    <div className="note-meta">
+                      <strong>{entry.appointment_date} · {entry.appointment_time}</strong>
+                      <span>{entry.appointment_type}</span>
+                    </div>
+                    <p><strong>Reason:</strong> {entry.reason || "No chief complaint recorded."}</p>
+                    <p><strong>Notes:</strong> {entry.notes || "No assistant observations recorded."}</p>
+                    <p><strong>Status:</strong> {appointmentStatusLabel(entry.status)}</p>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">No handover history saved for this patient yet.</div>
+              )}
             </div>
           </div>
         </div>
@@ -2289,6 +2351,40 @@ function Billing({ patient }: { patient: Patient | null }) {
 
   const activePatient =
     patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
+  const pendingInvoices = items.filter((item) => item.status !== "paid");
+  const paidInvoices = items.filter((item) => item.status === "paid");
+
+  const renderInvoiceRows = (rows: typeof items) =>
+    rows.map((item) => (
+      <tr key={item.id}>
+        <td>{item.invoice_number}</td>
+        <td>{item.patient}</td>
+        <td>{item.invoice_date}</td>
+        <td>{formatCurrency(Number(item.total))}</td>
+        <td>{formatCurrency(Number(item.balance))}</td>
+        <td>
+          <span className="status-badge">{item.status}</span>
+        </td>
+        <td>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="classic-button"
+              onClick={() => setEmailInvoice(item)}
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              className="classic-button"
+              onClick={() => setPaymentInvoice(item)}
+            >
+              Payment
+            </button>
+          </div>
+        </td>
+      </tr>
+    ));
 
   useEffect(() => {
     if (!supabase) return;
@@ -2439,60 +2535,47 @@ function Billing({ patient }: { patient: Patient | null }) {
       </div>
       {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
       <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Invoice</th>
-              <th>Patient</th>
-              <th>Date</th>
-              <th>Total</th>
-              <th>Balance</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.invoice_number}</td>
-                <td>{item.patient}</td>
-                <td>{item.invoice_date}</td>
-                <td>{formatCurrency(Number(item.total))}</td>
-                <td>{formatCurrency(Number(item.balance))}</td>
-                <td>
-                  <span className="status-badge">{item.status}</span>
-                </td>
-                <td>
-                  <div className="dialog-actions">
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => {
-                        setEmailInvoice(item);
-                        setRecipient(item.email);
-                        setMessage("");
-                      }}
-                    >
-                      Email
-                    </button>
-                    <button
-                      type="button"
-                      className="classic-button primary"
-                      onClick={() => {
-                        setPaymentInvoice(item);
-                        setPaymentAmount("");
-                        setMessage("");
-                      }}
-                    >
-                      Receive payment
-                    </button>
-                  </div>
-                </td>
+        <div className="invoice-section">
+          <h3>Pending invoices</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Patient</th>
+                <th>Date</th>
+                <th>Total</th>
+                <th>Balance</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!items.length && <div className="empty-state">No invoices found.</div>}
+            </thead>
+            <tbody>
+              {renderInvoiceRows(pendingInvoices)}
+            </tbody>
+          </table>
+          {!pendingInvoices.length && <div className="empty-state">No pending invoices.</div>}
+        </div>
+
+        <div className="invoice-section invoice-section-paid">
+          <h3>Paid invoices</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Patient</th>
+                <th>Date</th>
+                <th>Total</th>
+                <th>Balance</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {renderInvoiceRows(paidInvoices)}
+            </tbody>
+          </table>
+          {!paidInvoices.length && <div className="empty-state">No paid invoices.</div>}
+        </div>
       </div>
       {emailInvoice && (
         <div className="modal-backdrop">

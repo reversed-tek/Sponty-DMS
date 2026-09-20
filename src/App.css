@@ -72,6 +72,14 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .appointment-detail-body { display: grid; gap: 12px; min-width: min(520px, 94vw); }
 .appointment-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; color: var(--brand-blue-dark); }
 .appointment-detail-meta span { padding: 3px 8px; background: #edf4ff; border: 1px solid #bfd2ee; }
+.appointment-detail-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; background: #edf4ff; border: 1px solid #b6c9ea; }
+.appointment-detail-card > div { display: grid; gap: 4px; }
+.appointment-detail-card span, .appointment-detail-card small { color: #495c73; }
+.appointment-detail-card strong { color: var(--brand-blue-dark); }
+.appointment-section { display: grid; gap: 8px; }
+.appointment-section h3 { margin: 0; color: var(--brand-blue-dark); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+.appointment-section-completed { margin-top: 12px; }
+.appointment-row-completed { opacity: 0.82; background: #eef1f4; }
 .settings-panel { max-width: 900px; }.settings-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; }.settings-form label { display: grid; gap: 3px; }.settings-actions { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; }.settings-actions .send-success { margin: 0; }
 @media (max-width: 560px) { #root { padding: 0; }.workspace { display: block; }.sidebar { width: 100%; padding: 5px; border-right: 0; border-bottom: 1px solid #808080; }.sidebar nav { display: grid; grid-template-columns: repeat(2, 1fr); }.sidebar-section, .sidebar-note { display: none; }.main-panel { padding: 8px; }.toolbar { overflow-x: auto; }.filter-row { align-items: stretch; flex-wrap: wrap; }.filter-row .classic-button { margin-left: 0; }.patient-grid { grid-template-columns: 1fr 1fr; }.schedule-row { grid-template-columns: 65px 1fr; }.schedule-row .status-badge { grid-column: 2; }.appointment-row { grid-template-columns: 72px 1fr; }.appointment-row .status-badge, .appointment-row .classic-button, .appointment-row .calendar-sync { grid-column: 2; justify-self: start; }.settings-form { grid-template-columns: 1fr; }.status-right { display: none; } }
 
