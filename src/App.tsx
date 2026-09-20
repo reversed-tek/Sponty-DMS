@@ -1034,24 +1034,35 @@ function Patients({
                   {patientFiles.map((file) => (
                     <div className="document-item" key={`${file.bucket}-${file.id}`}>
                       <div className="document-meta">
-                        <strong>{file.file_name}</strong>
+                        <div className="document-name-row">
+                          <strong>{file.file_name}</strong>
+                          <div className="document-actions">
+                            {file.signedUrl ? (
+                              <>
+                                <a
+                                  href={file.signedUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="classic-button"
+                                >
+                                  Open
+                                </a>
+                                <a
+                                  href={file.signedUrl}
+                                  download={file.file_name}
+                                  className="classic-button"
+                                >
+                                  Download
+                                </a>
+                              </>
+                            ) : (
+                              <span className="file-unavailable">Unavailable</span>
+                            )}
+                          </div>
+                        </div>
                         <small>
                           {file.label} · {new Date(file.uploaded_at).toLocaleString()}
                         </small>
-                      </div>
-                      <div className="document-actions">
-                        {file.signedUrl ? (
-                          <a
-                            href={file.signedUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="classic-button"
-                          >
-                            Open
-                          </a>
-                        ) : (
-                          <span className="file-unavailable">Unavailable</span>
-                        )}
                       </div>
                     </div>
                   ))}
