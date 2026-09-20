@@ -1390,13 +1390,12 @@ function PatientCaseWorkspace({
         {[
           { id: "clinical", label: "Clinical Records" },
           { id: "chart", label: "Dental Chart" },
-          { id: "chat", label: "Dental Chat" },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             className={caseTab === tab.id ? "tab active" : "tab"}
-            onClick={() => setCaseTab(tab.id as "clinical" | "chart" | "chat")}
+            onClick={() => setCaseTab(tab.id as "clinical" | "chart")}
           >
             {tab.label}
           </button>
