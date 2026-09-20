@@ -1387,9 +1387,20 @@ function PatientCaseWorkspace({
         <span>{patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}</span>
       </div>
       <div className="tab-strip">
-        <button type="button" className={caseTab === "clinical" ? "tab active" : "tab"} onClick={() => setCaseTab("clinical")}>Clinical Records</button>
-        <button type="button" className={caseTab === "chart" ? "tab active" : "tab"} onClick={() => setCaseTab("chart")}>Dental Chart</button>
-        <button type="button" className={caseTab === "chat" ? "tab active" : "tab"} onClick={() => setCaseTab("chat")}>Dental Chat</button>
+        {[
+          { id: "clinical", label: "Clinical Records" },
+          { id: "chart", label: "Dental Chart" },
+          { id: "chat", label: "Dental Chat" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={caseTab === tab.id ? "tab active" : "tab"}
+            onClick={() => setCaseTab(tab.id as "clinical" | "chart" | "chat")}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {caseTab === "clinical" ? (
