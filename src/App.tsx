@@ -473,6 +473,7 @@ function App() {
               selected={selectedPatient}
               setSelected={setSelectedPatient}
               setNotice={setNotice}
+              onHandoverToDentist={handoverToDentist}
               onCompleteTreatment={completeTreatmentForAppointment}
             />
           )}
@@ -591,12 +592,14 @@ function Patients({
   selected,
   setSelected,
   setNotice,
+  onHandoverToDentist,
   onCompleteTreatment,
 }: {
   search: string;
   selected: Patient | null;
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
+  onHandoverToDentist: (appointmentId: string) => void;
   onCompleteTreatment: (appointmentId: string) => void;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -633,6 +636,8 @@ function Patients({
   const [filesLoading, setFilesLoading] = useState(false);
   const [appointmentSessionId, setAppointmentSessionId] = useState<string | null>(null);
   const [appointmentSessionDraft, setAppointmentSessionDraft] = useState({ reason: "", notes: "" });
+  const [appointmentTreatmentDraft, setAppointmentTreatmentDraft] = useState({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
+  const [appointmentNoteDraft, setAppointmentNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -1191,6 +1196,29 @@ function Patients({
                       <span>{upcomingAppointment.appointment_time}</span>
                       <span>{upcomingAppointment.appointment_type}</span>
                     </div>
+
+                    <div className="appointment-session-panel">
+                      <h3>Dentist session</h3>
+                      <div className="appointment-session-actions">
+                        <button
+                          type="button"
+                          className="classic-button primary"
+                          onClick={() => onCompleteTreatment(upcomingAppointment.id)}
+                          disabled={upcomingAppointment.status === "completed"}
+                        >
+                          Complete treatment
+                        </button>
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={() => onHandoverToDentist(upcomingAppointment.id)}
+                          disabled={upcomingAppointment.status === "completed" || upcomingAppointment.status === "in_progress"}
+                        >
+                          Handover to dentist
+                        </button>
+                      </div>
+                    </div>
+
                     <label>
                       Chief complaint
                       <input
@@ -1211,9 +1239,191 @@ function Patients({
                         placeholder="Add treatment notes or clinical observations"
                       />
                     </label>
+
+                    <div className="appointment-session-panel">
+                      <h3>Add treatment</h3>
+                      <div className="appointment-session-grid">
+                        <label>
+                          Procedure name
+                          <input
+                            value={appointmentTreatmentDraft.procedureName}
+                            onChange={(event) =>
+                              setAppointmentTreatmentDraft((current) => ({ ...current, procedureName: event.target.value }))
+                            }
+                            placeholder="e.g. Composite filling"
+                          />
+                        </label>
+                        <label>
+                          Tooth number
+                          <input
+                            type="number"
+                            min="11"
+                            max="48"
+                            value={appointmentTreatmentDraft.toothNumber}
+                            onChange={(event) =>
+                              setAppointmentTreatmentDraft((current) => ({ ...current, toothNumber: event.target.value }))
+                            }
+                            placeholder="18"
+                          />
+                        </label>
+                        <label>
+                          Cost
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={appointmentTreatmentDraft.cost}
+                            onChange={(event) =>
+                              setAppointmentTreatmentDraft((current) => ({ ...current, cost: event.target.value }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        Treatment notes
+                        <textarea
+                          value={appointmentTreatmentDraft.notes}
+                          onChange={(event) =>
+                            setAppointmentTreatmentDraft((current) => ({ ...current, notes: event.target.value }))
+                          }
+                          placeholder="Describe the procedure or treatment plan"
+                        />
+                      </label>
+                      <div className="dialog-actions">
+                        <button
+                          type="button"
+                          className="classic-button primary"
+                          onClick={async () => {
+                            if (!supabase || !appointmentSessionId) return;
+                            const procedureName = appointmentTreatmentDraft.procedureName.trim();
+                            if (!procedureName) {
+                              setNotice("Add a procedure name before saving the treatment.");
+                              return;
+                            }
+                            const { data: auth } = await supabase.auth.getUser();
+                            if (!auth.user) {
+                              setNotice("Your session is not available.");
+                              return;
+                            }
+                            const { error } = await supabase.from("treatments").insert({
+                              patient_id: selected.id,
+                              appointment_id: appointmentSessionId,
+                              provider_id: auth.user.id,
+                              treatment_date: upcomingAppointment.appointment_date,
+                              tooth_number: appointmentTreatmentDraft.toothNumber ? Number(appointmentTreatmentDraft.toothNumber) : null,
+                              procedure_name: procedureName,
+                              description: appointmentTreatmentDraft.notes.trim() || null,
+                              cost: Number(appointmentTreatmentDraft.cost || 0),
+                              notes: appointmentTreatmentDraft.notes.trim() || null,
+                              status: "planned",
+                              created_by: auth.user.id,
+                            });
+                            if (error) {
+                              setNotice(error.message);
+                              return;
+                            }
+                            setAppointmentTreatmentDraft({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
+                            setNotice("Treatment added to the appointment.");
+                          }}
+                        >
+                          Save treatment
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="appointment-session-panel">
+                      <h3>Clinical note</h3>
+                      <div className="appointment-session-grid">
+                        <label>
+                          Visit type
+                          <select
+                            value={appointmentNoteDraft.visitType}
+                            onChange={(event) =>
+                              setAppointmentNoteDraft((current) => ({ ...current, visitType: event.target.value }))
+                            }
+                          >
+                            <option value="consultation">Consultation</option>
+                            <option value="follow_up">Follow up</option>
+                            <option value="initial">Initial</option>
+                            <option value="emergency">Emergency</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label>
+                        Subjective
+                        <textarea
+                          value={appointmentNoteDraft.subjective}
+                          onChange={(event) =>
+                            setAppointmentNoteDraft((current) => ({ ...current, subjective: event.target.value }))
+                          }
+                          placeholder="Symptoms described by the patient"
+                        />
+                      </label>
+                      <label>
+                        Assessment
+                        <textarea
+                          value={appointmentNoteDraft.assessment}
+                          onChange={(event) =>
+                            setAppointmentNoteDraft((current) => ({ ...current, assessment: event.target.value }))
+                          }
+                          placeholder="Dentist assessment"
+                        />
+                      </label>
+                      <label>
+                        Plan
+                        <textarea
+                          value={appointmentNoteDraft.plan}
+                          onChange={(event) =>
+                            setAppointmentNoteDraft((current) => ({ ...current, plan: event.target.value }))
+                          }
+                          placeholder="Treatment or follow-up plan"
+                        />
+                      </label>
+                      <div className="dialog-actions">
+                        <button
+                          type="button"
+                          className="classic-button primary"
+                          onClick={async () => {
+                            if (!supabase || !appointmentSessionId) return;
+                            const subjective = appointmentNoteDraft.subjective.trim();
+                            const assessment = appointmentNoteDraft.assessment.trim();
+                            const plan = appointmentNoteDraft.plan.trim();
+                            if (!subjective && !assessment && !plan) {
+                              setNotice("Add at least one clinical note detail before saving.");
+                              return;
+                            }
+                            const { data: auth } = await supabase.auth.getUser();
+                            if (!auth.user) {
+                              setNotice("Your session is not available.");
+                              return;
+                            }
+                            const { error } = await supabase.from("clinical_notes").insert({
+                              patient_id: selected.id,
+                              appointment_id: appointmentSessionId,
+                              author_id: auth.user.id,
+                              visit_type: appointmentNoteDraft.visitType,
+                              note_date: upcomingAppointment.appointment_date,
+                              subjective: subjective || null,
+                              assessment: assessment || null,
+                              plan: plan || null,
+                              is_private: false,
+                            });
+                            if (error) {
+                              setNotice(error.message);
+                              return;
+                            }
+                            setAppointmentNoteDraft({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
+                            setNotice("Clinical note saved for the appointment.");
+                          }}
+                        >
+                          Save clinical note
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="dialog-actions">
                       <button type="button" className="classic-button" onClick={() => setAppointmentSessionId(null)}>
-                        Cancel
+                        Close
                       </button>
                       <button
                         type="button"
@@ -1407,6 +1617,8 @@ function Appointments({
   const [showForm, setShowForm] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "" });
+  const [treatmentDraft, setTreatmentDraft] = useState({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
+  const [noteDraft, setNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
@@ -1524,6 +1736,74 @@ function Appointments({
     setSelectedAppointmentId(null);
     setDetailDraft({ reason: "", notes: "" });
     setNotice("Appointment details saved");
+  }
+
+  async function saveDentistTreatment() {
+    if (!supabase || !selectedAppointmentId || !selectedAppointment) return;
+
+    const procedureName = treatmentDraft.procedureName.trim();
+    if (!procedureName) {
+      setMessage("Add a procedure name before saving the treatment.");
+      return;
+    }
+
+    const { data: auth } = await supabase.auth.getUser();
+    const toothNumber = treatmentDraft.toothNumber.trim();
+    const { error } = await supabase.from("treatments").insert({
+      patient_id: selectedAppointment.patient_id,
+      appointment_id: selectedAppointmentId,
+      provider_id: auth.user?.id ?? null,
+      treatment_date: selectedAppointment.appointment_date,
+      tooth_number: toothNumber ? Number(toothNumber) : null,
+      procedure_name: procedureName,
+      description: treatmentDraft.notes.trim() || null,
+      cost: Number(treatmentDraft.cost || 0),
+      notes: treatmentDraft.notes.trim() || null,
+      status: "planned",
+      created_by: auth.user?.id ?? null,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setTreatmentDraft({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
+    setNotice("Treatment added to the appointment.");
+  }
+
+  async function saveDentistClinicalNote() {
+    if (!supabase || !selectedAppointmentId || !selectedAppointment) return;
+
+    const subjective = noteDraft.subjective.trim();
+    const assessment = noteDraft.assessment.trim();
+    const plan = noteDraft.plan.trim();
+
+    if (!subjective && !assessment && !plan) {
+      setMessage("Add at least one clinical note detail before saving.");
+      return;
+    }
+
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from("clinical_notes").insert({
+      patient_id: selectedAppointment.patient_id,
+      appointment_id: selectedAppointmentId,
+      author_id: auth.user?.id ?? null,
+      visit_type: noteDraft.visitType,
+      note_date: selectedAppointment.appointment_date,
+      subjective: subjective || null,
+      assessment: assessment || null,
+      plan: plan || null,
+      is_private: false,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setNoteDraft({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
+    setNotice("Clinical note saved for the appointment.");
   }
 
   return (
@@ -1665,6 +1945,29 @@ function Appointments({
                 <span>{selectedAppointment.appointment_time}</span>
                 <span>{selectedAppointment.appointment_type}</span>
               </div>
+
+              <div className="appointment-session-panel">
+                <h3>Dentist session</h3>
+                <div className="appointment-session-actions">
+                  <button
+                    type="button"
+                    className="classic-button primary"
+                    onClick={() => onCompleteTreatment(selectedAppointment.id)}
+                    disabled={selectedAppointment.status === "completed"}
+                  >
+                    Complete treatment
+                  </button>
+                  <button
+                    type="button"
+                    className="classic-button"
+                    onClick={() => onHandoverToDentist(selectedAppointment.id)}
+                    disabled={selectedAppointment.status === "completed" || selectedAppointment.status === "in_progress"}
+                  >
+                    Handover to dentist
+                  </button>
+                </div>
+              </div>
+
               <label>
                 Chief complaint
                 <input
@@ -1685,9 +1988,121 @@ function Appointments({
                   placeholder="Add clinical observations, symptoms, or follow-up notes"
                 />
               </label>
+
+              <div className="appointment-session-panel">
+                <h3>Add treatment</h3>
+                <div className="appointment-session-grid">
+                  <label>
+                    Procedure name
+                    <input
+                      value={treatmentDraft.procedureName}
+                      onChange={(event) =>
+                        setTreatmentDraft((current) => ({ ...current, procedureName: event.target.value }))
+                      }
+                      placeholder="e.g. Composite filling"
+                    />
+                  </label>
+                  <label>
+                    Tooth number
+                    <input
+                      type="number"
+                      min="11"
+                      max="48"
+                      value={treatmentDraft.toothNumber}
+                      onChange={(event) =>
+                        setTreatmentDraft((current) => ({ ...current, toothNumber: event.target.value }))
+                      }
+                      placeholder="18"
+                    />
+                  </label>
+                  <label>
+                    Cost
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={treatmentDraft.cost}
+                      onChange={(event) =>
+                        setTreatmentDraft((current) => ({ ...current, cost: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+                <label>
+                  Treatment notes
+                  <textarea
+                    value={treatmentDraft.notes}
+                    onChange={(event) =>
+                      setTreatmentDraft((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    placeholder="Describe the procedure or treatment plan"
+                  />
+                </label>
+                <div className="dialog-actions">
+                  <button type="button" className="classic-button primary" onClick={saveDentistTreatment}>
+                    Save treatment
+                  </button>
+                </div>
+              </div>
+
+              <div className="appointment-session-panel">
+                <h3>Clinical note</h3>
+                <div className="appointment-session-grid">
+                  <label>
+                    Visit type
+                    <select
+                      value={noteDraft.visitType}
+                      onChange={(event) =>
+                        setNoteDraft((current) => ({ ...current, visitType: event.target.value }))
+                      }
+                    >
+                      <option value="consultation">Consultation</option>
+                      <option value="follow_up">Follow up</option>
+                      <option value="initial">Initial</option>
+                      <option value="emergency">Emergency</option>
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Subjective
+                  <textarea
+                    value={noteDraft.subjective}
+                    onChange={(event) =>
+                      setNoteDraft((current) => ({ ...current, subjective: event.target.value }))
+                    }
+                    placeholder="Symptoms described by the patient"
+                  />
+                </label>
+                <label>
+                  Assessment
+                  <textarea
+                    value={noteDraft.assessment}
+                    onChange={(event) =>
+                      setNoteDraft((current) => ({ ...current, assessment: event.target.value }))
+                    }
+                    placeholder="Dentist assessment"
+                  />
+                </label>
+                <label>
+                  Plan
+                  <textarea
+                    value={noteDraft.plan}
+                    onChange={(event) =>
+                      setNoteDraft((current) => ({ ...current, plan: event.target.value }))
+                    }
+                    placeholder="Treatment or follow-up plan"
+                  />
+                </label>
+                <div className="dialog-actions">
+                  <button type="button" className="classic-button primary" onClick={saveDentistClinicalNote}>
+                    Save clinical note
+                  </button>
+                </div>
+              </div>
+
               <div className="dialog-actions">
                 <button type="button" className="classic-button" onClick={() => setSelectedAppointmentId(null)}>
-                  Cancel
+                  Close
                 </button>
                 <button type="button" className="classic-button primary" onClick={saveAppointmentDetails}>
                   Save details
