@@ -75,6 +75,7 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .appointment-action-group { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .appointment-clinic-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; grid-column: 1 / -1; margin-top: 4px; padding-left: 4px; }
 .appointment-action-toggle { justify-self: start; }
+.appointment-tab-strip { margin-bottom: 10px; }
 .appointment-detail-body { display: grid; gap: 14px; min-width: min(760px, 94vw); max-height: min(82vh, 760px); overflow: auto; }
 .appointment-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; color: var(--brand-blue-dark); }
 .appointment-detail-meta span { padding: 3px 8px; background: #edf4ff; border: 1px solid #bfd2ee; }

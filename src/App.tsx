@@ -1619,6 +1619,7 @@ function Appointments({
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "" });
   const [treatmentDraft, setTreatmentDraft] = useState({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
   const [noteDraft, setNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
+  const [appointmentView, setAppointmentView] = useState<"active" | "completed">("active");
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
@@ -1814,121 +1815,140 @@ function Appointments({
         <div className="empty-state">Loading appointments...</div>
       ) : (
         <div className="appointment-list">
-          <div className="appointment-section">
-            <h3>Active appointments</h3>
-            {activeAppointments.map((item) => (
-              <div className="appointment-row" key={item.id}>
-                <time>
-                  {item.appointment_date} {item.appointment_time}
-                </time>
-                <div className="appointment-block">
-                  <strong>{item.patient_name}</strong>
-                  <span>
-                    {item.appointment_type} with {item.provider_name}
-                  </span>
-                </div>
-                <span className={`status-badge ${item.status}`}>
-                  {item.status}
-                </span>
-                <span
-                  className={
-                    item.outlook_event_id
-                      ? "calendar-sync synced"
-                      : "calendar-sync"
-                  }
-                >
-                  {item.outlook_event_id ? "Outlook synced" : "Local only"}
-                </span>
-                <div className="appointment-action-group">
-                  <button
-                    type="button"
-                    className="classic-button"
-                    disabled={Boolean(item.outlook_event_id)}
-                    onClick={() => sync(item)}
-                  >
-                    {item.outlook_event_id ? "Synced" : "Sync Outlook"}
-                  </button>
-                  <button
-                    type="button"
-                    className="classic-button"
-                    onClick={() => {
-                      setSelectedAppointmentId(item.id);
-                      setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
-                    }}
-                  >
-                    Open
-                  </button>
-                  <button
-                    type="button"
-                    className="classic-button appointment-action-toggle"
-                    onClick={() =>
-                      setExpandedActionId((current) =>
-                        current === item.id ? null : item.id,
-                      )
-                    }
-                  >
-                    {expandedActionId === item.id ? "Hide actions" : "Actions"}
-                  </button>
-                </div>
-                {expandedActionId === item.id && (
-                  <div className="appointment-clinic-actions">
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => onHandoverToDentist(item.id)}
-                      disabled={item.status === "completed"}
-                    >
-                      Handover to dentist
-                    </button>
-                    <button
-                      type="button"
-                      className="classic-button primary"
-                      onClick={() => onCompleteTreatment(item.id)}
-                      disabled={item.status === "completed"}
-                    >
-                      Complete treatment
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {!activeAppointments.length && <div className="empty-state">No active appointments.</div>}
+          <div className="appointment-tab-strip tab-strip">
+            <button
+              type="button"
+              className={appointmentView === "active" ? "tab active" : "tab"}
+              onClick={() => setAppointmentView("active")}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              className={appointmentView === "completed" ? "tab active" : "tab"}
+              onClick={() => setAppointmentView("completed")}
+            >
+              Completed
+            </button>
           </div>
 
-          {completedAppointments.length > 0 && (
-            <div className="appointment-section appointment-section-completed">
-              <h3>Completed appointments</h3>
-              {completedAppointments.map((item) => (
-                <div className="appointment-row appointment-row-completed" key={item.id}>
-                  <time>
-                    {item.appointment_date} {item.appointment_time}
-                  </time>
-                  <div className="appointment-block">
-                    <strong>{item.patient_name}</strong>
-                    <span>
-                      {item.appointment_type} with {item.provider_name}
+          <div className="appointment-section">
+            {appointmentView === "active" ? (
+              <>
+                <h3>Active appointments</h3>
+                {activeAppointments.map((item) => (
+                  <div className="appointment-row" key={item.id}>
+                    <time>
+                      {item.appointment_date} {item.appointment_time}
+                    </time>
+                    <div className="appointment-block">
+                      <strong>{item.patient_name}</strong>
+                      <span>
+                        {item.appointment_type} with {item.provider_name}
+                      </span>
+                    </div>
+                    <span className={`status-badge ${item.status}`}>
+                      {item.status}
                     </span>
-                  </div>
-                  <span className={`status-badge ${item.status}`}>
-                    {item.status}
-                  </span>
-                  <span className="calendar-sync synced">Invoice generated</span>
-                  <div className="appointment-action-group">
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => {
-                        setSelectedAppointmentId(item.id);
-                        setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
-                      }}
+                    <span
+                      className={
+                        item.outlook_event_id
+                          ? "calendar-sync synced"
+                          : "calendar-sync"
+                      }
                     >
-                      Open
-                    </button>
+                      {item.outlook_event_id ? "Outlook synced" : "Local only"}
+                    </span>
+                    <div className="appointment-action-group">
+                      <button
+                        type="button"
+                        className="classic-button"
+                        disabled={Boolean(item.outlook_event_id)}
+                        onClick={() => sync(item)}
+                      >
+                        {item.outlook_event_id ? "Synced" : "Sync Outlook"}
+                      </button>
+                      <button
+                        type="button"
+                        className="classic-button"
+                        onClick={() => {
+                          setSelectedAppointmentId(item.id);
+                          setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
+                        }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        className="classic-button appointment-action-toggle"
+                        onClick={() =>
+                          setExpandedActionId((current) =>
+                            current === item.id ? null : item.id,
+                          )
+                        }
+                      >
+                        {expandedActionId === item.id ? "Hide actions" : "Actions"}
+                      </button>
+                    </div>
+                    {expandedActionId === item.id && (
+                      <div className="appointment-clinic-actions">
+                        <button
+                          type="button"
+                          className="classic-button"
+                          onClick={() => onHandoverToDentist(item.id)}
+                          disabled={item.status === "completed"}
+                        >
+                          Handover to dentist
+                        </button>
+                        <button
+                          type="button"
+                          className="classic-button primary"
+                          onClick={() => onCompleteTreatment(item.id)}
+                          disabled={item.status === "completed"}
+                        >
+                          Complete treatment
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+                {!activeAppointments.length && <div className="empty-state">No active appointments.</div>}
+              </>
+            ) : (
+              <>
+                <h3>Completed appointments</h3>
+                {completedAppointments.length ? completedAppointments.map((item) => (
+                  <div className="appointment-row appointment-row-completed" key={item.id}>
+                    <time>
+                      {item.appointment_date} {item.appointment_time}
+                    </time>
+                    <div className="appointment-block">
+                      <strong>{item.patient_name}</strong>
+                      <span>
+                        {item.appointment_type} with {item.provider_name}
+                      </span>
+                    </div>
+                    <span className={`status-badge ${item.status}`}>
+                      {item.status}
+                    </span>
+                    <span className="calendar-sync synced">Invoice generated</span>
+                    <div className="appointment-action-group">
+                      <button
+                        type="button"
+                        className="classic-button"
+                        onClick={() => {
+                          setSelectedAppointmentId(item.id);
+                          setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
+                        }}
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </div>
+                )) : <div className="empty-state">No completed appointments.</div>}
+              </>
+            )}
+          </div>
         </div>
       )}
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
