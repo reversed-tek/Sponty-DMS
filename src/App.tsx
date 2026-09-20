@@ -418,7 +418,7 @@ function Patients({
     reason: string | null;
     provider_name: string | null;
   } | null>(null);
-  const [caseTab, setCaseTab] = useState<"clinical" | "chat">("clinical");
+  const [caseTab, setCaseTab] = useState<"clinical" | "chart" | "chat">("clinical");
   const [chatMessages, setChatMessages] = useState<
     Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>
   >([]);
@@ -1014,10 +1014,10 @@ function Patients({
               setChatDraft={setChatDraft}
               onCheckIn={checkInPatientAppointment}
               upcomingAppointment={upcomingAppointment}
+              setNotice={setNotice}
             />
 
             <div className="patient-detail-sections">
-              <DentalChart patient={selected} setNotice={setNotice} />
               <Treatments patient={selected} setNotice={setNotice} />
             </div>
 
@@ -1308,16 +1308,18 @@ function PatientCaseWorkspace({
   setChatDraft,
   onCheckIn,
   upcomingAppointment,
+  setNotice,
 }: {
   patient: Patient | null;
-  caseTab: "clinical" | "chat";
-  setCaseTab: (value: "clinical" | "chat") => void;
+  caseTab: "clinical" | "chart" | "chat";
+  setCaseTab: (value: "clinical" | "chart" | "chat") => void;
   chatMessages: Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>;
   setChatMessages: React.Dispatch<React.SetStateAction<Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>>>;
   chatDraft: string;
   setChatDraft: (value: string) => void;
   onCheckIn: (appointmentId: string) => void;
   upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; provider_name: string | null } | null;
+  setNotice: (message: string) => void;
 }) {
   const [notes, setNotes] = useState<
     Array<{
@@ -1386,6 +1388,7 @@ function PatientCaseWorkspace({
       </div>
       <div className="tab-strip">
         <button type="button" className={caseTab === "clinical" ? "tab active" : "tab"} onClick={() => setCaseTab("clinical")}>Clinical Records</button>
+        <button type="button" className={caseTab === "chart" ? "tab active" : "tab"} onClick={() => setCaseTab("chart")}>Dental Chart</button>
         <button type="button" className={caseTab === "chat" ? "tab active" : "tab"} onClick={() => setCaseTab("chat")}>Dental Chat</button>
       </div>
 
@@ -1431,6 +1434,10 @@ function PatientCaseWorkspace({
               )) : <div className="empty-state">No medical history recorded.</div>}
             </div>
           </div>
+        </div>
+      ) : caseTab === "chart" ? (
+        <div className="patient-case-body">
+          <DentalChart patient={patient} setNotice={setNotice} />
         </div>
       ) : (
         <div className="patient-case-body chat-panel">
