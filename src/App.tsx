@@ -1453,25 +1453,27 @@ function Appointments({
               >
                 {item.outlook_event_id ? "Outlook synced" : "Local only"}
               </span>
-              <button
-                type="button"
-                className="classic-button"
-                disabled={Boolean(item.outlook_event_id)}
-                onClick={() => sync(item)}
-              >
-                {item.outlook_event_id ? "Synced" : "Sync Outlook"}
-              </button>
-              <button
-                type="button"
-                className="classic-button appointment-action-toggle"
-                onClick={() =>
-                  setExpandedActionId((current) =>
-                    current === item.id ? null : item.id,
-                  )
-                }
-              >
-                {expandedActionId === item.id ? "Hide actions" : "Actions"}
-              </button>
+              <div className="appointment-action-group">
+                <button
+                  type="button"
+                  className="classic-button"
+                  disabled={Boolean(item.outlook_event_id)}
+                  onClick={() => sync(item)}
+                >
+                  {item.outlook_event_id ? "Synced" : "Sync Outlook"}
+                </button>
+                <button
+                  type="button"
+                  className="classic-button appointment-action-toggle"
+                  onClick={() =>
+                    setExpandedActionId((current) =>
+                      current === item.id ? null : item.id,
+                    )
+                  }
+                >
+                  {expandedActionId === item.id ? "Hide actions" : "Actions"}
+                </button>
+              </div>
               {expandedActionId === item.id && (
                 <div className="appointment-clinic-actions">
                   <button
