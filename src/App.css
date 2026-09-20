@@ -75,10 +75,23 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .appointment-action-group { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .appointment-clinic-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; grid-column: 1 / -1; margin-top: 4px; padding-left: 4px; }
 .appointment-action-toggle { justify-self: start; }
-.appointment-detail-body { display: grid; gap: 12px; min-width: min(520px, 94vw); }
+.appointment-detail-body { display: grid; gap: 14px; min-width: min(760px, 94vw); max-height: min(82vh, 760px); overflow: auto; }
 .appointment-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; color: var(--brand-blue-dark); }
 .appointment-detail-meta span { padding: 3px 8px; background: #edf4ff; border: 1px solid #bfd2ee; }
 .appointment-detail-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; background: #edf4ff; border: 1px solid #b6c9ea; }
+.appointment-session-panel { display: grid; gap: 10px; padding: 12px; background: #eef3f8; border: 1px solid #b9c9dc; }
+.appointment-session-panel h3 { margin: 0; color: var(--brand-blue-dark); font-size: 14px; letter-spacing: 0.02em; }
+.appointment-session-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.appointment-session-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dialog-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; background: var(--brand-blue-dark); color: #fff; font-weight: 700; }
+.dialog-title button { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 2px solid; border-color: #fff #404040 #404040 #fff; background: #c0c0c0; color: #000; }
+.dialog-body { display: grid; gap: 12px; padding: 12px; }
+.dialog-body label { display: grid; gap: 6px; color: var(--navy-text); font-weight: 700; font-size: 12px; }
+.dialog-body input, .dialog-body select, .dialog-body textarea { width: 100%; box-sizing: border-box; background: #fff; border: 2px solid; border-color: #404040 #fff #fff #404040; padding: 6px 8px; font: inherit; }
+.dialog-body textarea { min-height: 80px; resize: vertical; }
+.dialog-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+.classic-dialog { width: min(760px, 92vw); max-height: 88vh; overflow: auto; background: #c0c0c0; border: 2px solid; border-color: #fff #404040 #404040 #fff; box-shadow: 4px 4px 0 rgba(18, 24, 31, 0.5); }
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.35); }
 .appointment-detail-card > div { display: grid; gap: 4px; }
 .appointment-detail-card span, .appointment-detail-card small { color: #495c73; }
 .appointment-detail-card strong { color: var(--brand-blue-dark); }
