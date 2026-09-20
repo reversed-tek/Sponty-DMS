@@ -18,7 +18,7 @@ type Page =
   | "Reports"
   | "User Management"
   | "Practice Settings";
-type CaseTab = "clinical" | "chart" | "history";
+type CaseTab = "chart" | "history" | null;
 type Patient = {
   id: string;
   patient_number: string;
@@ -626,11 +626,13 @@ function Patients({
     notes: string | null;
     provider_name: string | null;
   } | null>(null);
-  const [caseTab, setCaseTab] = useState<CaseTab>("clinical");
+  const [caseTab, setCaseTab] = useState<CaseTab>(null);
   useEffect(() => {
-    setCaseTab("clinical");
+    setCaseTab(null);
   }, [selected?.id]);
   const [filesLoading, setFilesLoading] = useState(false);
+  const [appointmentSessionId, setAppointmentSessionId] = useState<string | null>(null);
+  const [appointmentSessionDraft, setAppointmentSessionDraft] = useState({ reason: "", notes: "" });
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -1131,6 +1133,19 @@ function Patients({
                     <span className="status-badge">
                       {appointmentStatusLabel(upcomingAppointment.status)}
                     </span>
+                    <button
+                      type="button"
+                      className="classic-button primary"
+                      onClick={() => {
+                        setAppointmentSessionId(upcomingAppointment.id);
+                        setAppointmentSessionDraft({
+                          reason: upcomingAppointment.reason ?? "",
+                          notes: upcomingAppointment.notes ?? "",
+                        });
+                      }}
+                    >
+                      Open appointment
+                    </button>
                   </div>
                 </div>
               )}
@@ -1161,9 +1176,72 @@ function Patients({
               setNotice={setNotice}
             />
 
-            <div className="patient-detail-sections">
-              <Treatments patient={selected} setNotice={setNotice} />
-            </div>
+            {appointmentSessionId && upcomingAppointment && (
+              <div className="modal-backdrop">
+                <section className="classic-dialog" role="dialog" aria-modal="true">
+                  <div className="dialog-title">
+                    {selected.first_name} {selected.last_name}
+                    <button type="button" onClick={() => setAppointmentSessionId(null)}>
+                      X
+                    </button>
+                  </div>
+                  <div className="dialog-body appointment-detail-body">
+                    <div className="appointment-detail-meta">
+                      <span>{upcomingAppointment.appointment_date}</span>
+                      <span>{upcomingAppointment.appointment_time}</span>
+                      <span>{upcomingAppointment.appointment_type}</span>
+                    </div>
+                    <label>
+                      Chief complaint
+                      <input
+                        value={appointmentSessionDraft.reason}
+                        onChange={(event) =>
+                          setAppointmentSessionDraft((current) => ({ ...current, reason: event.target.value }))
+                        }
+                        placeholder="e.g. Tooth pain on upper right molar"
+                      />
+                    </label>
+                    <label>
+                      Assistant notes
+                      <textarea
+                        value={appointmentSessionDraft.notes}
+                        onChange={(event) =>
+                          setAppointmentSessionDraft((current) => ({ ...current, notes: event.target.value }))
+                        }
+                        placeholder="Add treatment notes or clinical observations"
+                      />
+                    </label>
+                    <div className="dialog-actions">
+                      <button type="button" className="classic-button" onClick={() => setAppointmentSessionId(null)}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="classic-button primary"
+                        onClick={async () => {
+                          if (!supabase || !appointmentSessionId) return;
+                          const { error } = await supabase
+                            .from("appointments")
+                            .update({
+                              reason: appointmentSessionDraft.reason.trim() || null,
+                              notes: appointmentSessionDraft.notes.trim() || null,
+                            })
+                            .eq("id", appointmentSessionId);
+                          if (error) {
+                            setNotice(error.message);
+                            return;
+                          }
+                          setAppointmentSessionId(null);
+                          setNotice("Appointment session saved");
+                        }}
+                      >
+                        Save details
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
 
             <section className="panel patient-files">
               <div className="panel-title">Patient Files</div>
@@ -1717,22 +1795,25 @@ function PatientCaseWorkspace({
       </div>
       <div className="tab-strip">
         {[
-          { id: "clinical", label: "Clinical Records" },
-          { id: "history", label: "Handover History" },
+          { id: "history", label: "History" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             className={caseTab === tab.id ? "tab active" : "tab"}
-            onClick={() => setCaseTab(tab.id as CaseTab)}
+            onClick={() => setCaseTab(tab.id as Exclude<CaseTab, null>)}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {caseTab === "clinical" ? (
+      {caseTab === null ? (
+        <div className="patient-case-body">
+          <div className="empty-state">Select a patient history or dental chart view.</div>
+        </div>
+      ) : caseTab === "history" ? (
         <div className="patient-case-body">
           <div className="case-summary-row">
             {upcomingAppointment ? (
@@ -1787,6 +1868,20 @@ function PatientCaseWorkspace({
           </div>
           <div className="case-columns" style={{ marginTop: "10px" }}>
             <div className="case-column">
+              <h3>Appointment history</h3>
+              {handoverHistory.length ? handoverHistory.map((entry) => (
+                <article className="case-note" key={entry.id}>
+                  <div className="note-meta">
+                    <strong>{entry.appointment_date} · {entry.appointment_time}</strong>
+                    <span>{entry.appointment_type}</span>
+                  </div>
+                  <p><strong>Reason:</strong> {entry.reason || "No chief complaint recorded."}</p>
+                  <p><strong>Notes:</strong> {entry.notes || "No assistant observations recorded."}</p>
+                  <p><strong>Status:</strong> {appointmentStatusLabel(entry.status)}</p>
+                </article>
+              )) : <div className="empty-state">No appointment history saved for this patient yet.</div>}
+            </div>
+            <div className="case-column">
               <h3>Patient history</h3>
               {history.length ? history.slice(0, 4).map((entry) => (
                 <div className="case-history-item" key={entry.id}>
@@ -1795,40 +1890,6 @@ function PatientCaseWorkspace({
                   <span>{entry.severity ?? "Active"}</span>
                 </div>
               )) : <div className="empty-state">No medical history recorded.</div>}
-            </div>
-            <div className="case-column">
-              <h3>Dental workflow</h3>
-              <div className="case-note">
-                <div className="note-meta"><strong>Current state</strong></div>
-                <p>{upcomingAppointment ? appointmentStatusLabel(upcomingAppointment.status) : "No active visit selected."}</p>
-              </div>
-              <div className="case-note">
-                <div className="note-meta"><strong>System rule</strong></div>
-                <p>Appointments connect handover notes, clinical records, treatment, and invoice generation in one flow.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : caseTab === "history" ? (
-        <div className="patient-case-body">
-          <div className="case-columns">
-            <div className="case-column" style={{ width: "100%" }}>
-              <h3>Handover history</h3>
-              {handoverHistory.length ? (
-                handoverHistory.map((entry) => (
-                  <article className="case-note" key={entry.id}>
-                    <div className="note-meta">
-                      <strong>{entry.appointment_date} · {entry.appointment_time}</strong>
-                      <span>{entry.appointment_type}</span>
-                    </div>
-                    <p><strong>Reason:</strong> {entry.reason || "No chief complaint recorded."}</p>
-                    <p><strong>Notes:</strong> {entry.notes || "No assistant observations recorded."}</p>
-                    <p><strong>Status:</strong> {appointmentStatusLabel(entry.status)}</p>
-                  </article>
-                ))
-              ) : (
-                <div className="empty-state">No handover history saved for this patient yet.</div>
-              )}
             </div>
           </div>
         </div>
