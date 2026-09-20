@@ -1525,13 +1525,12 @@ function DentalChart({
   return (
     <div className="content-stack">
       <section className="panel dental-panel">
-        <div className="panel-title">
-          Interactive Dental Chart{" "}
-          <span>
-            {patient.first_name} {patient.last_name} | FDI notation
+        <div className="dental-toolbar">
+          <span className="dental-chart-summary">
+            {patient.first_name} {patient.last_name} · FDI notation
           </span>
+          <button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ Record condition</button>
         </div>
-        <div className="dental-toolbar"><button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ Record condition</button></div>
         {error && <p className="send-error">{error}</p>}
         <div className="tooth-grid">
           {toothNumbers.map((number) => (
