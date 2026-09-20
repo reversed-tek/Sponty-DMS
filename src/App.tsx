@@ -98,6 +98,7 @@ function App() {
   const [profileError, setProfileError] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [notice, setNotice] = useState("Ready");
+  const [, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
@@ -190,6 +191,200 @@ function App() {
     setPage(next);
     setNotice(`${next} selected`);
   };
+
+  async function checkInPatientAppointment(appointmentId: string) {
+    if (!supabase) return;
+
+    try {
+      const { data: appointment, error: fetchError } = await supabase
+        .from("appointments")
+        .select("id, patient_id, appointment_date, appointment_time, appointment_type, status, reason, notes")
+        .eq("id", appointmentId)
+        .single();
+
+      if (fetchError || !appointment) throw new Error(fetchError?.message ?? "Appointment not found.");
+
+      const { data: patientRecord, error: patientError } = await supabase
+        .from("patients")
+        .select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies")
+        .eq("id", appointment.patient_id)
+        .single();
+
+      if (patientError || !patientRecord) throw new Error(patientError?.message ?? "Patient not found.");
+
+      const { error: updateError } = await supabase
+        .from("appointments")
+        .update({ status: "in_progress" })
+        .eq("id", appointmentId);
+
+      if (updateError) throw updateError;
+
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Your user session is not available.");
+
+      const handoverSummary = [appointment.reason, appointment.notes].filter(Boolean).join(" | ") || "Patient ready for dentist review.";
+
+      const { error: treatmentError } = await supabase.from("treatments").insert({
+        patient_id: appointment.patient_id,
+        appointment_id: appointmentId,
+        treatment_date: appointment.appointment_date,
+        procedure_name: appointment.appointment_type,
+        status: "in_progress",
+        notes: `Prepared for dentist from appointment at ${appointment.appointment_time}. ${handoverSummary}`,
+        provider_id: auth.user.id,
+        created_by: auth.user.id,
+      });
+
+      if (treatmentError) throw treatmentError;
+
+      const { error: noteError } = await supabase.from("clinical_notes").insert({
+        patient_id: appointment.patient_id,
+        appointment_id: appointmentId,
+        author_id: auth.user.id,
+        visit_type: "consultation",
+        note_date: appointment.appointment_date,
+        subjective: appointment.reason ?? "Reason for visit not recorded.",
+        objective: appointment.notes ?? "No assistant observations recorded.",
+        assessment: "Awaiting dentist assessment.",
+        plan: "Review appointment handover and proceed with treatment plan.",
+        is_private: false,
+      });
+
+      if (noteError) throw noteError;
+
+      if (selectedPatient && selectedPatient.id === appointment.patient_id) {
+        setSelectedPatient({ ...selectedPatient, ...patientRecord });
+      }
+
+      setNotice(`Patient ${patientRecord.first_name} ${patientRecord.last_name} checked in and is ready for the dentist.`);
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "Patient check-in failed.";
+      setNotice("Check-in failed");
+      setError(message);
+    }
+  }
+
+  async function handoverToDentist(appointmentId: string) {
+    if (!supabase) return;
+
+    try {
+      const { data: appointment, error: fetchError } = await supabase
+        .from("appointments")
+        .select("id, patient_id, reason, notes, status")
+        .eq("id", appointmentId)
+        .single();
+
+      if (fetchError || !appointment) throw new Error(fetchError?.message ?? "Appointment not found.");
+
+      const nextNotes = [appointment.reason, appointment.notes].filter(Boolean).join(" | ") || "Patient handed over to dentist.";
+
+      const { error: updateError } = await supabase
+        .from("appointments")
+        .update({ status: "in_progress", notes: nextNotes, reason: appointment.reason ?? "Dental consultation" })
+        .eq("id", appointmentId);
+
+      if (updateError) throw updateError;
+
+      setNotice("Appointment handed over to the dentist.");
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "Handover failed.";
+      setNotice("Handover failed");
+      setError(message);
+    }
+  }
+
+  async function completeTreatmentForAppointment(appointmentId: string) {
+    if (!supabase) return;
+
+    try {
+      const { data: appointment, error: appointmentError } = await supabase
+        .from("appointments")
+        .select("id, patient_id, status")
+        .eq("id", appointmentId)
+        .single();
+
+      if (appointmentError || !appointment) throw new Error(appointmentError?.message ?? "Appointment not found.");
+
+      const { data: treatmentRows, error: treatmentError } = await supabase
+        .from("treatments")
+        .select("cost, procedure_name")
+        .eq("appointment_id", appointmentId);
+
+      if (treatmentError) throw treatmentError;
+      if (!treatmentRows || treatmentRows.length === 0) {
+        throw new Error("Add at least one treatment before completing the appointment.");
+      }
+
+      const { data: existingInvoice, error: invoiceCheckError } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("appointment_id", appointmentId)
+        .maybeSingle();
+
+      if (invoiceCheckError) throw invoiceCheckError;
+      if (existingInvoice) {
+        setNotice("Invoice already exists for this appointment.");
+        return;
+      }
+
+      const subtotal = treatmentRows.reduce((sum, row) => sum + Number(row.cost ?? 0), 0);
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Your user session is not available.");
+
+      const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
+      const { data: createdInvoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .insert({
+          invoice_number: invoiceNumber,
+          patient_id: appointment.patient_id,
+          appointment_id: appointmentId,
+          subtotal,
+          total: subtotal,
+          balance: subtotal,
+          amount_paid: 0,
+          status: "pending",
+          notes: `Auto-generated from appointment ${appointmentId}`,
+          created_by: auth.user.id,
+        })
+        .select("id")
+        .single();
+
+      if (invoiceError) throw invoiceError;
+      if (!createdInvoice) throw new Error("Invoice could not be created.");
+
+      const invoiceItems = treatmentRows.map((row) => ({
+        invoice_id: createdInvoice.id,
+        treatment_id: null,
+        description: row.procedure_name,
+        quantity: 1,
+        unit_price: Number(row.cost ?? 0),
+        total: Number(row.cost ?? 0),
+      }));
+
+      const { error: itemError } = await supabase
+        .from("invoice_items")
+        .insert(invoiceItems);
+
+      if (itemError) throw itemError;
+
+      const { error: statusError } = await supabase
+        .from("appointments")
+        .update({ status: "completed" })
+        .eq("id", appointmentId);
+
+      if (statusError) throw statusError;
+
+      setNotice("Treatment completed and invoice generated automatically.");
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "Complete treatment failed.";
+      setNotice("Treatment completion failed");
+      setError(message);
+    }
+  }
+
   return (
     <div className="app-window">
       <header className="title-bar">
@@ -277,9 +472,19 @@ function App() {
               selected={selectedPatient}
               setSelected={setSelectedPatient}
               setNotice={setNotice}
+              onCheckIn={checkInPatientAppointment}
+              onHandoverToDentist={handoverToDentist}
+              onCompleteTreatment={completeTreatmentForAppointment}
             />
           )}
-          {page === "Appointments" && <Appointments setNotice={setNotice} />}
+          {page === "Appointments" && (
+            <Appointments
+              setNotice={setNotice}
+              onCheckIn={checkInPatientAppointment}
+              onHandoverToDentist={handoverToDentist}
+              onCompleteTreatment={completeTreatmentForAppointment}
+            />
+          )}
           {page === "Treatments" && (
             <Treatments patient={selectedPatient} setNotice={setNotice} />
           )}
@@ -387,11 +592,17 @@ function Patients({
   selected,
   setSelected,
   setNotice,
+  onCheckIn,
+  onHandoverToDentist,
+  onCompleteTreatment,
 }: {
   search: string;
   selected: Patient | null;
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
+  onCheckIn: (appointmentId: string) => void;
+  onHandoverToDentist: (appointmentId: string) => void;
+  onCompleteTreatment: (appointmentId: string) => void;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -752,202 +963,6 @@ function Patients({
     }
   }
 
-  async function checkInPatientAppointment(appointmentId: string) {
-    if (!supabase || !selected) return;
-
-    try {
-      const { data: appointment, error: fetchError } = await supabase
-        .from("appointments")
-        .select("id, patient_id, appointment_date, appointment_time, appointment_type, status, reason, notes")
-        .eq("id", appointmentId)
-        .single();
-
-      if (fetchError || !appointment) throw new Error(fetchError?.message ?? "Appointment not found.");
-
-      const { error: updateError } = await supabase
-        .from("appointments")
-        .update({ status: "in_progress" })
-        .eq("id", appointmentId);
-
-      if (updateError) throw updateError;
-
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) throw new Error("Your user session is not available.");
-
-      const handoverSummary = [appointment.reason, appointment.notes].filter(Boolean).join(" | ") || "Patient ready for dentist review.";
-
-      const { error: treatmentError } = await supabase.from("treatments").insert({
-        patient_id: appointment.patient_id,
-        appointment_id: appointmentId,
-        treatment_date: appointment.appointment_date,
-        procedure_name: appointment.appointment_type,
-        status: "in_progress",
-        notes: `Prepared for dentist from appointment at ${appointment.appointment_time}. ${handoverSummary}`,
-        provider_id: auth.user.id,
-        created_by: auth.user.id,
-      });
-
-      if (treatmentError) throw treatmentError;
-
-      const { error: noteError } = await supabase.from("clinical_notes").insert({
-        patient_id: appointment.patient_id,
-        appointment_id: appointmentId,
-        author_id: auth.user.id,
-        visit_type: "consultation",
-        note_date: appointment.appointment_date,
-        subjective: appointment.reason ?? "Reason for visit not recorded.",
-        objective: appointment.notes ?? "No assistant observations recorded.",
-        assessment: "Awaiting dentist assessment.",
-        plan: "Review appointment handover and proceed with treatment plan.",
-        is_private: false,
-      });
-
-      if (noteError) throw noteError;
-
-      setUpcomingAppointment((current) =>
-        current && current.id === appointmentId
-          ? { ...current, status: "in_progress", reason: appointment.reason, notes: appointment.notes }
-          : current,
-      );
-      setNotice("Patient checked in and appointment handover is ready for the dentist.");
-    } catch (reason) {
-      const message =
-        reason instanceof Error ? reason.message : "Patient check-in failed.";
-      setError(message);
-      setNotice("Check-in failed");
-    }
-  }
-
-  async function handoverToDentist(appointmentId: string) {
-    if (!supabase || !selected) return;
-
-    try {
-      const { data: appointment, error: fetchError } = await supabase
-        .from("appointments")
-        .select("id, patient_id, reason, notes, status")
-        .eq("id", appointmentId)
-        .single();
-
-      if (fetchError || !appointment) throw new Error(fetchError?.message ?? "Appointment not found.");
-
-      const nextNotes = [appointment.reason, appointment.notes].filter(Boolean).join(" | ") || "Patient handed over to dentist.";
-
-      const { error: updateError } = await supabase
-        .from("appointments")
-        .update({ status: "in_progress", notes: nextNotes, reason: appointment.reason ?? "Dental consultation" })
-        .eq("id", appointmentId);
-
-      if (updateError) throw updateError;
-
-      setUpcomingAppointment((current) =>
-        current && current.id === appointmentId
-          ? { ...current, status: "in_progress", reason: appointment.reason, notes: nextNotes }
-          : current,
-      );
-      setNotice("Appointment handed over to the dentist.");
-    } catch (reason) {
-      const message =
-        reason instanceof Error ? reason.message : "Handover failed.";
-      setError(message);
-      setNotice("Handover failed");
-    }
-  }
-
-  async function completeTreatmentForAppointment(appointmentId: string) {
-    if (!supabase || !selected) return;
-
-    try {
-      const { data: appointment, error: appointmentError } = await supabase
-        .from("appointments")
-        .select("id, patient_id, status")
-        .eq("id", appointmentId)
-        .single();
-
-      if (appointmentError || !appointment) throw new Error(appointmentError?.message ?? "Appointment not found.");
-
-      const { data: treatmentRows, error: treatmentError } = await supabase
-        .from("treatments")
-        .select("cost, procedure_name")
-        .eq("appointment_id", appointmentId);
-
-      if (treatmentError) throw treatmentError;
-      if (!treatmentRows || treatmentRows.length === 0) {
-        throw new Error("Add at least one treatment before completing the appointment.");
-      }
-
-      const { data: existingInvoice, error: invoiceCheckError } = await supabase
-        .from("invoices")
-        .select("id")
-        .eq("appointment_id", appointmentId)
-        .maybeSingle();
-
-      if (invoiceCheckError) throw invoiceCheckError;
-      if (existingInvoice) {
-        setNotice("Invoice already exists for this appointment.");
-        return;
-      }
-
-      const subtotal = treatmentRows.reduce((sum, row) => sum + Number(row.cost ?? 0), 0);
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) throw new Error("Your user session is not available.");
-
-      const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
-      const { data: createdInvoice, error: invoiceError } = await supabase
-        .from("invoices")
-        .insert({
-          invoice_number: invoiceNumber,
-          patient_id: appointment.patient_id,
-          appointment_id: appointmentId,
-          subtotal,
-          total: subtotal,
-          balance: subtotal,
-          amount_paid: 0,
-          status: "pending",
-          notes: `Auto-generated from appointment ${appointmentId}`,
-          created_by: auth.user.id,
-        })
-        .select("id")
-        .single();
-
-      if (invoiceError) throw invoiceError;
-      if (!createdInvoice) throw new Error("Invoice could not be created.");
-
-      const invoiceItems = treatmentRows.map((row) => ({
-        invoice_id: createdInvoice.id,
-        treatment_id: null,
-        description: row.procedure_name,
-        quantity: 1,
-        unit_price: Number(row.cost ?? 0),
-        total: Number(row.cost ?? 0),
-      }));
-
-      const { error: itemError } = await supabase
-        .from("invoice_items")
-        .insert(invoiceItems);
-
-      if (itemError) throw itemError;
-
-      const { error: statusError } = await supabase
-        .from("appointments")
-        .update({ status: "completed" })
-        .eq("id", appointmentId);
-
-      if (statusError) throw statusError;
-
-      setUpcomingAppointment((current) =>
-        current && current.id === appointmentId
-          ? { ...current, status: "completed" }
-          : current,
-      );
-      setNotice("Treatment completed and invoice generated automatically.");
-    } catch (reason) {
-      const message =
-        reason instanceof Error ? reason.message : "Complete treatment failed.";
-      setError(message);
-      setNotice("Treatment completion failed");
-    }
-  }
-
   return (
     <div className="content-stack">
       <section className="panel">
@@ -1121,7 +1136,7 @@ function Patients({
                     <button
                       type="button"
                       className="classic-button primary"
-                      onClick={() => void checkInPatientAppointment(upcomingAppointment.id)}
+                      onClick={() => void onCheckIn(upcomingAppointment.id)}
                       disabled={upcomingAppointment.status === "in_progress"}
                     >
                       {upcomingAppointment.status === "in_progress" ? "Ready for dentist" : "Check in"}
@@ -1151,9 +1166,9 @@ function Patients({
               patient={selected}
               caseTab={caseTab}
               setCaseTab={setCaseTab}
-              onCheckIn={checkInPatientAppointment}
-              onHandoverToDentist={handoverToDentist}
-              onCompleteTreatment={completeTreatmentForAppointment}
+              onCheckIn={onCheckIn}
+              onHandoverToDentist={onHandoverToDentist}
+              onCompleteTreatment={onCompleteTreatment}
               upcomingAppointment={upcomingAppointment}
               setNotice={setNotice}
             />
@@ -1308,7 +1323,17 @@ function Patients({
   );
 }
 
-function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
+function Appointments({
+  setNotice,
+  onCheckIn,
+  onHandoverToDentist,
+  onCompleteTreatment,
+}: {
+  setNotice: (message: string) => void;
+  onCheckIn: (appointmentId: string) => void;
+  onHandoverToDentist: (appointmentId: string) => void;
+  onCompleteTreatment: (appointmentId: string) => void;
+}) {
   const [items, setItems] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1435,6 +1460,32 @@ function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
               >
                 {item.outlook_event_id ? "Synced" : "Sync Outlook"}
               </button>
+              <div className="appointment-clinic-actions">
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  onClick={() => onCheckIn(item.id)}
+                  disabled={item.status === "in_progress" || item.status === "completed"}
+                >
+                  {item.status === "in_progress" ? "Ready for dentist" : "Check in"}
+                </button>
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => onHandoverToDentist(item.id)}
+                  disabled={item.status === "completed"}
+                >
+                  Handover
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  onClick={() => onCompleteTreatment(item.id)}
+                  disabled={item.status === "completed"}
+                >
+                  Complete
+                </button>
+              </div>
             </div>
           ))}
         </div>
