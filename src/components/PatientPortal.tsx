@@ -8,6 +8,7 @@ type PortalData = Awaited<ReturnType<typeof getPatientPortalData>>;
 
 const formatMoney = (value: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
 const statusLabel = (status: string) => status === "pending_verification" ? "Pending Verification" : status === "unpaid" ? "Unpaid" : status[0].toUpperCase() + status.slice(1);
+const acceptedUploadTypes = "image/png,image/jpeg,image/webp,application/pdf,.png,.jpg,.jpeg,.webp,.pdf";
 
 function FileDrop({ sessionToken, onUploaded }: { sessionToken: string; onUploaded: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +26,7 @@ function FileDrop({ sessionToken, onUploaded }: { sessionToken: string; onUpload
       <div className="explorer-toolbar"><strong>Patient Documents</strong><button type="button" className="classic-button" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? "Uploading..." : "Add File"}</button></div>
       <div className="drop-zone"><div className="folder-icon">DIR</div><div><strong>Drop X-rays or medical records here</strong><small>PNG, JPG, PDF, or WEBP up to 10 MB</small></div></div>
     </div>
-    <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ""; }} />
+    <input ref={inputRef} type="file" accept={acceptedUploadTypes} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ""; }} />
     {message && <p className="portal-notice">{message}</p>}
   </>;
 }
@@ -71,7 +72,7 @@ export function PatientPortal({ token }: PatientPortalProps) {
     <header className="title-bar"><div className="title-bar-text"><span className="app-mark">+</span> Sponty Patient Portal</div></header>
     <div className="portal-toolbar">Secure session for <strong>{data.patient_name}</strong><span>Expires {new Date(context.expires_at).toLocaleTimeString()}</span></div>
     <main className="portal-body">
-      <section className="portal-panel"><div className="panel-title">Outstanding Invoices</div>{openInvoices.length === 0 ? <p className="empty-state">No outstanding invoices.</p> : openInvoices.map((invoice) => <article className="portal-invoice" key={invoice.id}><div><strong>{invoice.invoice_number}</strong><small>{invoice.invoice_date}</small></div><div><span className={`portal-status ${invoice.status}`}>{statusLabel(invoice.status)}</span><strong>{formatMoney(invoice.balance)}</strong></div><label className="portal-upload-button">Upload receipt<input type="file" accept="image/png,image/jpeg,application/pdf" disabled={uploadingInvoice === invoice.id} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadProof(invoice, file); event.currentTarget.value = ""; }} /></label></article>)}</section>
+      <section className="portal-panel"><div className="panel-title">Outstanding Invoices</div>{openInvoices.length === 0 ? <p className="empty-state">No outstanding invoices.</p> : openInvoices.map((invoice) => <article className="portal-invoice" key={invoice.id}><div><strong>{invoice.invoice_number}</strong><small>{invoice.invoice_date}</small></div><div><span className={`portal-status ${invoice.status}`}>{statusLabel(invoice.status)}</span><strong>{formatMoney(invoice.balance)}</strong></div><label className="portal-upload-button">Upload receipt<input type="file" accept={acceptedUploadTypes} disabled={uploadingInvoice === invoice.id} hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadProof(invoice, file); event.currentTarget.value = ""; }} /></label></article>)}</section>
       <fieldset className="portal-bank"><legend>Bank Transfer Instructions</legend><p>Use this reference code when making your transfer:</p><strong className="payment-reference">REF-{openInvoices[0]?.invoice_number ?? "PORTAL"}</strong><dl><dt>Bank Name</dt><dd>{data.bank?.bank_name ?? "Contact the clinic"}</dd><dt>Account Name</dt><dd>{data.bank?.account_name ?? "Sponty Dental Services"}</dd><dt>Account Number / IBAN</dt><dd>{data.bank?.account_number ?? "Available from the clinic"}</dd></dl></fieldset>
       {proofMessage && <p className="portal-notice">{proofMessage}</p>}
       <FileDrop sessionToken={context.session_token} onUploaded={() => void refresh(context.session_token)} />
