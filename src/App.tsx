@@ -627,6 +627,9 @@ function Patients({
     provider_name: string | null;
   } | null>(null);
   const [caseTab, setCaseTab] = useState<CaseTab>("clinical");
+  useEffect(() => {
+    setCaseTab("clinical");
+  }, [selected?.id]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
@@ -1991,6 +1994,9 @@ function Treatments({
 
   const activePatient =
     patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
+  const visibleItems = activePatient
+    ? items.filter((item) => item.patient_id === activePatient.id)
+    : [];
 
   const resetForm = () =>
     setForm({
@@ -2017,11 +2023,18 @@ function Treatments({
         }
       });
 
+    const activeId = selectedPatientId || patient?.id;
+    if (!activeId) {
+      setItems([]);
+      return;
+    }
+
     supabase
       .from("treatments")
       .select(
         "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
       )
+      .eq("patient_id", activeId)
       .order("treatment_date", { ascending: false })
       .then(({ data, error: fetchError }) => {
         setItems((data ?? []) as unknown as typeof items);
@@ -2194,7 +2207,7 @@ function Treatments({
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <tr key={item.id}>
                 <td>{item.treatment_date}</td>
                 <td>
@@ -2230,8 +2243,8 @@ function Treatments({
             ))}
           </tbody>
         </table>
-        {!items.length && (
-          <div className="empty-state">No treatments found.</div>
+        {!visibleItems.length && (
+          <div className="empty-state">No treatments found for this patient.</div>
         )}
       </div>
       {!activePatient && <p className="empty-state">Choose a patient from the dropdown before adding a treatment.</p>}
@@ -2331,6 +2344,7 @@ function Billing({ patient }: { patient: Patient | null }) {
       amount_paid: number;
       balance: number;
       status: string;
+      patient_id: string;
       patient: string;
       email: string;
     }>
@@ -2351,8 +2365,11 @@ function Billing({ patient }: { patient: Patient | null }) {
 
   const activePatient =
     patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
-  const pendingInvoices = items.filter((item) => item.status !== "paid");
-  const paidInvoices = items.filter((item) => item.status === "paid");
+  const filteredByPatient = activePatient
+    ? items.filter((item) => item.patient_id === activePatient.id)
+    : [];
+  const pendingInvoices = filteredByPatient.filter((item) => item.status !== "paid");
+  const paidInvoices = filteredByPatient.filter((item) => item.status === "paid");
 
   const renderInvoiceRows = (rows: typeof items) =>
     rows.map((item) => (
@@ -2408,7 +2425,7 @@ function Billing({ patient }: { patient: Patient | null }) {
     supabase
       .from("invoices")
       .select(
-        "id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)",
+        "id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)",
       )
       .order("invoice_date", { ascending: false })
       .then(({ data }) =>
@@ -2421,6 +2438,7 @@ function Billing({ patient }: { patient: Patient | null }) {
             } | null;
             return {
               ...item,
+              patient_id: item.patient_id,
               patient: patientData
                 ? `${patientData.first_name} ${patientData.last_name}`
                 : "Unknown patient",
@@ -2494,9 +2512,9 @@ function Billing({ patient }: { patient: Patient | null }) {
     if (!supabase || !activePatient || !form.total) return;
     const { data: auth } = await supabase.auth.getUser();
     const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
+    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
     if (insertError) setMessage(insertError.message);
-    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
+    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
   }
   return (
     <section className="panel">
