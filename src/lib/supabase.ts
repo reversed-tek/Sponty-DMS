@@ -1,15 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const appConfig = {
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  appUrl: import.meta.env.VITE_APP_URL || window.location.origin,
+  entraClientId: import.meta.env.VITE_ENTRA_CLIENT_ID,
+  entraTenantId: import.meta.env.VITE_ENTRA_TENANT_ID,
+}
+
+const supabaseUrl = appConfig.supabaseUrl
+const supabaseAnonKey = appConfig.supabaseAnonKey
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null
 
+export const appEnv = appConfig
+
 export async function signInWithMicrosoft() {
   if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.')
-  const appUrl = import.meta.env.VITE_APP_URL || window.location.origin
+  const appUrl = appEnv.appUrl
   return supabase.auth.signInWithOAuth({
     provider: 'azure',
     options: {
