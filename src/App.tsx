@@ -1821,6 +1821,8 @@ function Treatments({
       patients: { first_name: string; last_name: string } | null;
     }>
   >([]);
+  const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(patient?.id ?? "");
   const [showForm, setShowForm] = useState(false);
   const [editingTreatment, setEditingTreatment] = useState<(typeof items)[number] | null>(null);
   const [error, setError] = useState("");
@@ -1831,6 +1833,9 @@ function Treatments({
     status: "planned",
     notes: "",
   });
+
+  const activePatient =
+    patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
 
   const resetForm = () =>
     setForm({
@@ -1844,6 +1849,20 @@ function Treatments({
   useEffect(() => {
     if (!supabase) return;
     supabase
+      .from("patients")
+      .select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies")
+      .eq("is_active", true)
+      .order("last_name")
+      .then(({ data }) => {
+        const nextPatients = data ?? [];
+        setPatientOptions(nextPatients);
+        if (patient && !selectedPatientId) setSelectedPatientId(patient.id);
+        if (patient && !nextPatients.some((option) => option.id === patient.id)) {
+          setSelectedPatientId(patient.id);
+        }
+      });
+
+    supabase
       .from("treatments")
       .select(
         "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
@@ -1853,10 +1872,10 @@ function Treatments({
         setItems((data ?? []) as unknown as typeof items);
         if (fetchError) setError(fetchError.message);
       });
-  }, []);
+  }, [patient, selectedPatientId]);
 
   const openNewTreatment = () => {
-    if (!patient) return;
+    if (!activePatient) return;
     setEditingTreatment(null);
     resetForm();
     setShowForm(true);
@@ -1875,11 +1894,11 @@ function Treatments({
   };
 
   async function saveTreatment() {
-    if (!supabase || !patient) return;
+    if (!supabase || !activePatient) return;
     if (!form.procedure_name) return;
 
     const payload = {
-      patient_id: editingTreatment?.patient_id ?? patient.id,
+      patient_id: editingTreatment?.patient_id ?? activePatient.id,
       procedure_name: form.procedure_name.trim(),
       tooth_number: form.tooth_number ? Number(form.tooth_number) : null,
       cost: Number(form.cost || 0),
@@ -1968,10 +1987,42 @@ function Treatments({
           type="button"
           className="classic-button primary"
           onClick={openNewTreatment}
-          disabled={!patient}
+          disabled={!activePatient}
         >
           + New Treatment
         </button>
+      </div>
+      <div className="filter-row">
+        <label>
+          Patient
+          <input
+            list="treatment-patient-options"
+            value={
+              activePatient
+                ? `${activePatient.first_name} ${activePatient.last_name} (${activePatient.patient_number})`
+                : ""
+            }
+            placeholder="Type patient name or number"
+            onChange={(event) => {
+              const rawValue = event.target.value.trim();
+              const match = patientOptions.find(
+                (option) =>
+                  `${option.first_name} ${option.last_name} (${option.patient_number})` === rawValue ||
+                  `${option.first_name} ${option.last_name}` === rawValue ||
+                  option.patient_number === rawValue,
+              );
+              setSelectedPatientId(match ? match.id : "");
+            }}
+          />
+          <datalist id="treatment-patient-options">
+            {patientOptions.map((option) => (
+              <option
+                key={option.id}
+                value={`${option.first_name} ${option.last_name} (${option.patient_number})`}
+              />
+            ))}
+          </datalist>
+        </label>
       </div>
       {error && <p className="send-error">{error}</p>}
       <div className="table-wrap">
@@ -2028,7 +2079,7 @@ function Treatments({
           <div className="empty-state">No treatments found.</div>
         )}
       </div>
-      {!patient && <p className="empty-state">Select a patient from Patients before adding a treatment.</p>}
+      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before adding a treatment.</p>}
       {showForm && (
         <div className="modal-backdrop">
           <section className="classic-dialog" role="dialog" aria-modal="true">
@@ -2039,7 +2090,7 @@ function Treatments({
               </button>
             </div>
             <div className="dialog-body">
-              <p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p>
+              <p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p>
               <label>
                 Procedure name
                 <input
@@ -2129,6 +2180,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       email: string;
     }>
   >([]);
+  const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(patient?.id ?? "");
   const [emailInvoice, setEmailInvoice] = useState<
     (typeof items)[number] | null
   >(null);
@@ -2140,6 +2193,26 @@ function Billing({ patient }: { patient: Patient | null }) {
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
+
+  const activePatient =
+    patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("patients")
+      .select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies")
+      .eq("is_active", true)
+      .order("last_name")
+      .then(({ data }) => {
+        const nextPatients = data ?? [];
+        setPatientOptions(nextPatients);
+        if (patient && !selectedPatientId) setSelectedPatientId(patient.id);
+        if (patient && !nextPatients.some((option) => option.id === patient.id)) {
+          setSelectedPatientId(patient.id);
+        }
+      });
+  }, [patient, selectedPatientId]);
 
   function refreshInvoiceList() {
     if (!supabase) return;
@@ -2229,17 +2302,49 @@ function Billing({ patient }: { patient: Patient | null }) {
   }
 
   async function addInvoice() {
-    if (!supabase || !patient || !form.total) return;
+    if (!supabase || !activePatient || !form.total) return;
     const { data: auth } = await supabase.auth.getUser();
     const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: patient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
+    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
     if (insertError) setMessage(insertError.message);
     else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
   }
   return (
     <section className="panel">
-      <div className="panel-title">Invoice Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!patient}>+ New Invoice</button></div>
-      {!patient && <p className="empty-state">Select a patient from Patients before creating an invoice.</p>}
+      <div className="panel-title">Invoice Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!activePatient}>+ New Invoice</button></div>
+      <div className="filter-row">
+        <label>
+          Patient
+          <input
+            list="billing-patient-options"
+            value={
+              activePatient
+                ? `${activePatient.first_name} ${activePatient.last_name} (${activePatient.patient_number})`
+                : ""
+            }
+            placeholder="Type patient name or number"
+            onChange={(event) => {
+              const rawValue = event.target.value.trim();
+              const match = patientOptions.find(
+                (option) =>
+                  `${option.first_name} ${option.last_name} (${option.patient_number})` === rawValue ||
+                  `${option.first_name} ${option.last_name}` === rawValue ||
+                  option.patient_number === rawValue,
+              );
+              setSelectedPatientId(match ? match.id : "");
+            }}
+          />
+          <datalist id="billing-patient-options">
+            {patientOptions.map((option) => (
+              <option
+                key={option.id}
+                value={`${option.first_name} ${option.last_name} (${option.patient_number})`}
+              />
+            ))}
+          </datalist>
+        </label>
+      </div>
+      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
       <div className="table-wrap">
         <table>
           <thead>
@@ -2385,7 +2490,7 @@ function Billing({ patient }: { patient: Patient | null }) {
           </section>
         </div>
       )}
-      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Invoice <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {patient?.first_name} {patient?.last_name}</p><label>Total amount<input type="number" min="0" step="0.01" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label><label>Due date<input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.total} onClick={addInvoice}>Save Invoice</button></div></div></section></div>}
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Invoice <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p><label>Total amount<input type="number" min="0" step="0.01" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label><label>Due date<input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.total} onClick={addInvoice}>Save Invoice</button></div></div></section></div>}
     </section>
   );
 }
