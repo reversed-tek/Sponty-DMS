@@ -52,15 +52,6 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .case-history-item { display: grid; gap: 4px; }
 .case-history-item small { color: #495c73; }
 .case-history-item span { justify-self: start; padding: 2px 6px; background: #eaf3ff; color: #3a5f8b; border: 1px solid #bdd4ee; }
-.chat-panel { display: grid; gap: 10px; }
-.chat-thread { display: grid; gap: 8px; max-height: 250px; overflow: auto; padding: 8px; background: #f5f7fa; border: 1px solid #c2ccd7; }
-.chat-message { max-width: 78%; padding: 8px 10px; border: 1px solid #d0d8e0; background: #fff; }
-.chat-message.assistant { justify-self: start; }
-.chat-message.staff { justify-self: end; background: #edf5ff; }
-.chat-header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; font-size: 11px; color: #4a6278; }
-.chat-message p { margin: 0; line-height: 1.4; }
-.chat-compose { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.chat-compose textarea { min-height: 70px; resize: vertical; }
 .send-success, .send-error { padding: 7px; border: 1px solid #808080; }.send-success { color: #064b06; background: #c8f0c8; }.send-error { color: #800000; background: #ffdada; }
 @media (max-width: 800px) { #root { padding: 0; }.app-window { min-height: 100vh; border: 0; box-shadow: none; }.sidebar { width: 155px; flex-basis: 155px; }.quick-search { display: none; }.dashboard-grid { grid-template-columns: 1fr; }.schedule-panel, .quick-panel { grid-column: auto; grid-row: auto; }.page-heading { align-items: start; gap: 10px; }.heading-actions { flex-direction: column; }.patient-grid { grid-template-columns: repeat(2, 1fr); }.tooth-grid { grid-template-columns: repeat(8, minmax(34px, 1fr)); }.report-grid { grid-template-columns: 1fr; }.settings-form { grid-template-columns: repeat(2, 1fr); } }
  .appointment-row { grid-template-columns: 90px minmax(150px, 1fr) 105px 100px 95px; }.settings-panel { max-width: 900px; }.settings-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; }.settings-form label { display: grid; gap: 3px; }.settings-actions { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; }.settings-actions .send-success { margin: 0; }
