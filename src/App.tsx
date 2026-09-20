@@ -1717,25 +1717,6 @@ function PatientCaseWorkspace({
   upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; notes: string | null; provider_name: string | null } | null;
   setNotice: (message: string) => void;
 }) {
-  const [notes, setNotes] = useState<
-    Array<{
-      id: string;
-      note_date: string;
-      visit_type: string;
-      subjective: string | null;
-      assessment: string | null;
-      plan: string | null;
-    }>
-  >([]);
-  const [history, setHistory] = useState<
-    Array<{
-      id: string;
-      record_type: string;
-      name: string;
-      detail: string | null;
-      severity: string | null;
-    }>
-  >([]);
   const [handoverHistory, setHandoverHistory] = useState<
     Array<{
       id: string;
@@ -1747,32 +1728,19 @@ function PatientCaseWorkspace({
       status: string;
     }>
   >([]);
+  const [selectedHistoryAppointmentId, setSelectedHistoryAppointmentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase || !patient) return;
 
-    Promise.all([
-      supabase
-        .from("clinical_notes")
-        .select("id, note_date, visit_type, subjective, assessment, plan")
-        .eq("patient_id", patient.id)
-        .order("note_date", { ascending: false }),
-      supabase
-        .from("medical_history")
-        .select("id, record_type, name, detail, severity")
-        .eq("patient_id", patient.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("appointments")
-        .select("id, appointment_date, appointment_time, appointment_type, status, reason, notes")
-        .eq("patient_id", patient.id)
-        .order("appointment_date", { ascending: false })
-        .order("appointment_time", { ascending: false }),
-    ]).then(([notesResult, historyResult, handoverResult]) => {
-      setNotes(notesResult.data ?? []);
-      setHistory(historyResult.data ?? []);
-      setHandoverHistory(
-        (handoverResult.data ?? [])
+    supabase
+      .from("appointments")
+      .select("id, appointment_date, appointment_time, appointment_type, status, reason, notes")
+      .eq("patient_id", patient.id)
+      .order("appointment_date", { ascending: false })
+      .order("appointment_time", { ascending: false })
+      .then((handoverResult) => {
+        const historyEntries = (handoverResult.data ?? [])
           .filter((item) => item.status === "in_progress" || item.status === "completed")
           .map((item) => ({
             id: item.id,
@@ -1782,9 +1750,17 @@ function PatientCaseWorkspace({
             reason: item.reason,
             notes: item.notes,
             status: item.status,
-          })),
-      );
-    });
+          }));
+
+        setHandoverHistory(historyEntries);
+        setSelectedHistoryAppointmentId((currentSelection) => {
+          if (!historyEntries.length) return null;
+          if (currentSelection && historyEntries.some((item) => item.id === currentSelection)) {
+            return currentSelection;
+          }
+          return historyEntries[0].id;
+        });
+      });
   }, [patient]);
 
   return (
@@ -1815,83 +1791,55 @@ function PatientCaseWorkspace({
         </div>
       ) : caseTab === "history" ? (
         <div className="patient-case-body">
-          <div className="case-summary-row">
-            {upcomingAppointment ? (
-              <div className="case-appointment-box">
-                <div>
-                  <span>Appointment summary</span>
-                  <strong>{upcomingAppointment.appointment_type}</strong>
-                  <small>
-                    {upcomingAppointment.appointment_date} · {upcomingAppointment.appointment_time}
-                  </small>
+          {(() => {
+            const selectedHistoryAppointment =
+              handoverHistory.find((entry) => entry.id === selectedHistoryAppointmentId) ?? handoverHistory[0] ?? null;
+
+            return (
+              <div className="case-columns">
+                <div className="case-column">
+                  <h3>Past appointments</h3>
+                  {handoverHistory.length ? handoverHistory.map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      className={selectedHistoryAppointment?.id === entry.id ? "history-selector active" : "history-selector"}
+                      onClick={() => setSelectedHistoryAppointmentId(entry.id)}
+                    >
+                      <div className="history-selector-header">
+                        <strong>{entry.appointment_date}</strong>
+                        <span>{entry.appointment_type}</span>
+                      </div>
+                      <small>{entry.appointment_time}</small>
+                      <p>{entry.reason || "No chief complaint recorded."}</p>
+                    </button>
+                  )) : <div className="empty-state">No appointment history saved for this patient yet.</div>}
                 </div>
-                <div className="case-action-stack">
-                  <button type="button" className="classic-button primary" onClick={() => onCompleteTreatment(upcomingAppointment.id)} disabled={upcomingAppointment.status === "completed"}>
-                    Complete treatment
-                  </button>
+
+                <div className="case-column">
+                  {selectedHistoryAppointment ? (
+                    <>
+                      <h3>{selectedHistoryAppointment.appointment_date} · {selectedHistoryAppointment.appointment_time}</h3>
+                      <div className="case-note">
+                        <div className="note-meta"><strong>Appointment type</strong><span>{selectedHistoryAppointment.appointment_type}</span></div>
+                        <p><strong>Status:</strong> {appointmentStatusLabel(selectedHistoryAppointment.status)}</p>
+                      </div>
+                      <div className="case-note">
+                        <div className="note-meta"><strong>Reason for visit</strong></div>
+                        <p>{selectedHistoryAppointment.reason || "No chief complaint recorded."}</p>
+                      </div>
+                      <div className="case-note">
+                        <div className="note-meta"><strong>Assistant notes</strong></div>
+                        <p>{selectedHistoryAppointment.notes || "No assistant observations recorded."}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="empty-state">Select a past appointment to view the details.</div>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="case-appointment-box empty-box">
-                <span>No upcoming visit</span>
-                <small>Schedule an appointment to prep the treatment flow.</small>
-              </div>
-            )}
-          </div>
-          <div className="case-columns">
-            <div className="case-column">
-              <h3>Assistant handover</h3>
-              {upcomingAppointment ? (
-                <>
-                  <div className="case-note">
-                    <div className="note-meta"><strong>Reason for visit</strong></div>
-                    <p>{upcomingAppointment.reason || "No chief complaint recorded."}</p>
-                  </div>
-                  <div className="case-note">
-                    <div className="note-meta"><strong>Assistant notes</strong></div>
-                    <p>{upcomingAppointment.notes || "No assistant observations recorded yet."}</p>
-                  </div>
-                </>
-              ) : (
-                <div className="empty-state">No appointment handover on file.</div>
-              )}
-            </div>
-            <div className="case-column">
-              <h3>Clinical notes</h3>
-              {notes.length ? notes.slice(0, 3).map((note) => (
-                <article className="case-note" key={note.id}>
-                  <div className="note-meta"><strong>{note.note_date}</strong><span>{note.visit_type}</span></div>
-                  <p>{note.assessment || note.subjective || note.plan || "No detailed note recorded."}</p>
-                </article>
-              )) : <div className="empty-state">No clinical notes on record.</div>}
-            </div>
-          </div>
-          <div className="case-columns" style={{ marginTop: "10px" }}>
-            <div className="case-column">
-              <h3>Appointment history</h3>
-              {handoverHistory.length ? handoverHistory.map((entry) => (
-                <article className="case-note" key={entry.id}>
-                  <div className="note-meta">
-                    <strong>{entry.appointment_date} · {entry.appointment_time}</strong>
-                    <span>{entry.appointment_type}</span>
-                  </div>
-                  <p><strong>Reason:</strong> {entry.reason || "No chief complaint recorded."}</p>
-                  <p><strong>Notes:</strong> {entry.notes || "No assistant observations recorded."}</p>
-                  <p><strong>Status:</strong> {appointmentStatusLabel(entry.status)}</p>
-                </article>
-              )) : <div className="empty-state">No appointment history saved for this patient yet.</div>}
-            </div>
-            <div className="case-column">
-              <h3>Patient history</h3>
-              {history.length ? history.slice(0, 4).map((entry) => (
-                <div className="case-history-item" key={entry.id}>
-                  <strong>{entry.name}</strong>
-                  <small>{entry.record_type}</small>
-                  <span>{entry.severity ?? "Active"}</span>
-                </div>
-              )) : <div className="empty-state">No medical history recorded.</div>}
-            </div>
-          </div>
+            );
+          })()}
         </div>
       ) : (
         <div className="patient-case-body">
