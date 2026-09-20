@@ -1339,6 +1339,7 @@ function Appointments({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   useEffect(() => {
     if (!supabase) return;
@@ -1460,32 +1461,45 @@ function Appointments({
               >
                 {item.outlook_event_id ? "Synced" : "Sync Outlook"}
               </button>
-              <div className="appointment-clinic-actions">
-                <button
-                  type="button"
-                  className="classic-button primary"
-                  onClick={() => onCheckIn(item.id)}
-                  disabled={item.status === "in_progress" || item.status === "completed"}
-                >
-                  {item.status === "in_progress" ? "Ready for dentist" : "Check in"}
-                </button>
-                <button
-                  type="button"
-                  className="classic-button"
-                  onClick={() => onHandoverToDentist(item.id)}
-                  disabled={item.status === "completed"}
-                >
-                  Handover
-                </button>
-                <button
-                  type="button"
-                  className="classic-button primary"
-                  onClick={() => onCompleteTreatment(item.id)}
-                  disabled={item.status === "completed"}
-                >
-                  Complete
-                </button>
-              </div>
+              <button
+                type="button"
+                className="classic-button appointment-action-toggle"
+                onClick={() =>
+                  setExpandedActionId((current) =>
+                    current === item.id ? null : item.id,
+                  )
+                }
+              >
+                {expandedActionId === item.id ? "Hide actions" : "Actions"}
+              </button>
+              {expandedActionId === item.id && (
+                <div className="appointment-clinic-actions">
+                  <button
+                    type="button"
+                    className="classic-button primary"
+                    onClick={() => onCheckIn(item.id)}
+                    disabled={item.status === "in_progress" || item.status === "completed"}
+                  >
+                    {item.status === "in_progress" ? "Ready for dentist" : "Check in"}
+                  </button>
+                  <button
+                    type="button"
+                    className="classic-button"
+                    onClick={() => onHandoverToDentist(item.id)}
+                    disabled={item.status === "completed"}
+                  >
+                    Handover
+                  </button>
+                  <button
+                    type="button"
+                    className="classic-button primary"
+                    onClick={() => onCompleteTreatment(item.id)}
+                    disabled={item.status === "completed"}
+                  >
+                    Complete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
