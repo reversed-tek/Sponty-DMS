@@ -393,6 +393,19 @@ function Patients({
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [patientFiles, setPatientFiles] = useState<
+    Array<{
+      id: string;
+      bucket: "payment-proofs" | "patient-documents";
+      file_name: string;
+      content_type: string;
+      storage_path: string;
+      uploaded_at: string;
+      label: string;
+      signedUrl: string | null;
+    }>
+  >([]);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -424,6 +437,74 @@ function Patients({
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !selected) {
+      setPatientFiles([]);
+      return;
+    }
+
+    let isMounted = true;
+    const loadFiles = async () => {
+      setFilesLoading(true);
+      try {
+        const [documentsResult, proofsResult] = await Promise.all([
+          client
+            .from("patient_documents")
+            .select("id, file_name, storage_path, content_type, uploaded_at")
+            .eq("patient_id", selected.id)
+            .order("uploaded_at", { ascending: false }),
+          client
+            .from("payment_proofs")
+            .select("id, file_name, storage_path, content_type, uploaded_at")
+            .eq("patient_id", selected.id)
+            .order("uploaded_at", { ascending: false }),
+        ]);
+
+        const records = [
+          ...(documentsResult.data ?? []).map((item) => ({
+            ...item,
+            bucket: "patient-documents" as const,
+            label: "Patient document",
+          })),
+          ...(proofsResult.data ?? []).map((item) => ({
+            ...item,
+            bucket: "payment-proofs" as const,
+            label: "Payment receipt",
+          })),
+        ].sort(
+          (left, right) =>
+            new Date(right.uploaded_at).getTime() - new Date(left.uploaded_at).getTime(),
+        );
+
+        const resolved = await Promise.all(
+          records.map(async (record) => {
+            const { data: signed, error } = await client.storage
+              .from(record.bucket)
+              .createSignedUrl(record.storage_path, 3600);
+
+            return {
+              ...record,
+              signedUrl: error || !signed?.signedUrl ? null : signed.signedUrl,
+            };
+          }),
+        );
+
+        if (!isMounted) return;
+        setPatientFiles(resolved);
+      } catch {
+        if (isMounted) setPatientFiles([]);
+      } finally {
+        if (isMounted) setFilesLoading(false);
+      }
+    };
+
+    void loadFiles();
+    return () => {
+      isMounted = false;
+    };
+  }, [selected]);
 
   const filtered = useMemo(
     () =>
@@ -707,49 +788,88 @@ function Patients({
         )}
       </section>
       {selected && (
-        <section className="panel patient-summary">
-          <div className="panel-title">
-            Patient Summary <span>Record {selected.patient_number}</span>
-          </div>
-          <div className="patient-grid">
-            <div>
-              <span>Full name</span>
-              <strong className="patient-name">
-                {selected.first_name} {selected.last_name}
-              </strong>
+        <>
+          <section className="panel patient-summary">
+            <div className="panel-title">
+              Patient Summary <span>Record {selected.patient_number}</span>
             </div>
-            <div>
-              <span>Date of birth</span>
-              <strong>{selected.date_of_birth}</strong>
+            <div className="patient-grid">
+              <div>
+                <span>Full name</span>
+                <strong className="patient-name">
+                  {selected.first_name} {selected.last_name}
+                </strong>
+              </div>
+              <div>
+                <span>Date of birth</span>
+                <strong>{selected.date_of_birth}</strong>
+              </div>
+              <div>
+                <span>Telephone</span>
+                <strong>{selected.phone ?? "-"}</strong>
+              </div>
+              <div>
+                <span>Status</span>
+                <span className="status-badge active">
+                  {selected.is_active ? "Active" : "Inactive"}
+                </span>
+              </div>
             </div>
-            <div>
-              <span>Telephone</span>
-              <strong>{selected.phone ?? "-"}</strong>
+            <div className="dialog-actions" style={{ marginTop: "1rem" }}>
+              <button
+                type="button"
+                className="classic-button primary"
+                onClick={() => void sendPortalLink(selected)}
+              >
+                Send Portal Link
+              </button>
+              <button
+                type="button"
+                className="classic-button"
+                onClick={() => void copyPortalLink(selected)}
+              >
+                Copy Portal Link
+              </button>
             </div>
-            <div>
-              <span>Status</span>
-              <span className="status-badge active">
-                {selected.is_active ? "Active" : "Inactive"}
-              </span>
-            </div>
-          </div>
-          <div className="dialog-actions" style={{ marginTop: "1rem" }}>
-            <button
-              type="button"
-              className="classic-button primary"
-              onClick={() => void sendPortalLink(selected)}
-            >
-              Send Portal Link
-            </button>
-            <button
-              type="button"
-              className="classic-button"
-              onClick={() => void copyPortalLink(selected)}
-            >
-              Copy Portal Link
-            </button>
-          </div>
-        </section>
+          </section>
+          <section className="panel patient-files">
+            <div className="panel-title">Patient Files</div>
+            {filesLoading ? (
+              <div className="empty-state">Loading uploaded files...</div>
+            ) : patientFiles.length === 0 ? (
+              <div className="empty-state">
+                No files uploaded for this patient yet.
+              </div>
+            ) : (
+              <div className="document-list">
+                {patientFiles.map((file) => (
+                  <div className="document-item" key={`${file.bucket}-${file.id}`}>
+                    <div className="document-meta">
+                      <strong>{file.file_name}</strong>
+                      <small>
+                        {file.label} · {new Date(file.uploaded_at).toLocaleString()}
+                      </small>
+                    </div>
+                    <div className="document-actions">
+                      {file.signedUrl ? (
+                        <a
+                          href={file.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="classic-button"
+                        >
+                          Open
+                        </a>
+                      ) : (
+                        <span className="file-unavailable">Unavailable</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
       {showAdd && (
         <div className="modal-backdrop">
