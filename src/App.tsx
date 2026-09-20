@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
-import { createCalendarEvent, sendInvoiceEmail } from "./lib/outlook";
+import {
+  createCalendarEvent,
+  sendInvoiceEmail,
+  sendPatientPortalAccessEmail,
+} from "./lib/outlook";
 import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
 import { PatientPortal } from "./components/PatientPortal";
 
@@ -537,6 +541,76 @@ function Patients({
     setNotice("Patient deleted");
   }
 
+  async function getPatientPortalToken(patient: Patient) {
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    const { data: token, error: tokenError } = await supabase.rpc(
+      "issue_patient_portal_token",
+      {
+        p_patient_id: patient.id,
+        p_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      },
+    );
+
+    if (tokenError) throw new Error(tokenError.message);
+    if (!token) throw new Error("Portal token could not be generated.");
+
+    return String(token);
+  }
+
+  async function getPatientPortalUrl(patient: Patient) {
+    const token = await getPatientPortalToken(patient);
+    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    return `${appUrl.replace(/\/$/, "")}/portal/${encodeURIComponent(token)}`;
+  }
+
+  async function sendPortalLink(patient: Patient) {
+    if (!supabase) return;
+    if (!patient.email) {
+      setNotice("Add an email address before sending the patient portal link.");
+      return;
+    }
+
+    try {
+      const token = await getPatientPortalToken(patient);
+      await sendPatientPortalAccessEmail(
+        patient.email,
+        `${patient.first_name} ${patient.last_name}`,
+        token,
+        import.meta.env.VITE_APP_URL || window.location.origin,
+      );
+
+      setNotice("Patient portal link sent");
+    } catch (reason) {
+      const message =
+        reason instanceof Error
+          ? reason.message
+          : "Patient portal link could not be sent.";
+      setError(message);
+      setNotice("Portal link failed");
+    }
+  }
+
+  async function copyPortalLink(patient: Patient) {
+    try {
+      const portalUrl = await getPatientPortalUrl(patient);
+      if (!navigator.clipboard) {
+        window.prompt("Copy the patient portal link:", portalUrl);
+        setNotice("Portal link prepared");
+        return;
+      }
+      await navigator.clipboard.writeText(portalUrl);
+      setNotice("Portal link copied to clipboard");
+    } catch (reason) {
+      const message =
+        reason instanceof Error
+          ? reason.message
+          : "Patient portal link could not be copied.";
+      setError(message);
+      setNotice("Copy failed");
+    }
+  }
+
   return (
     <div className="content-stack">
       <section className="panel">
@@ -658,6 +732,22 @@ function Patients({
                 {selected.is_active ? "Active" : "Inactive"}
               </span>
             </div>
+          </div>
+          <div className="dialog-actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="classic-button primary"
+              onClick={() => void sendPortalLink(selected)}
+            >
+              Send Portal Link
+            </button>
+            <button
+              type="button"
+              className="classic-button"
+              onClick={() => void copyPortalLink(selected)}
+            >
+              Copy Portal Link
+            </button>
           </div>
         </section>
       )}
