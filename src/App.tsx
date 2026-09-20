@@ -296,8 +296,8 @@ function App() {
     }
   }
 
-  async function completeTreatmentForAppointment(appointmentId: string) {
-    if (!supabase) return;
+  async function completeTreatmentForAppointment(appointmentId: string): Promise<boolean> {
+    if (!supabase) return false;
 
     try {
       const { data: appointment, error: appointmentError } = await supabase
@@ -327,7 +327,7 @@ function App() {
       if (invoiceCheckError) throw invoiceCheckError;
       if (existingInvoice) {
         setNotice("Invoice already exists for this appointment.");
-        return;
+        return false;
       }
 
       const subtotal = treatmentRows.reduce((sum, row) => sum + Number(row.cost ?? 0), 0);
@@ -378,11 +378,13 @@ function App() {
       if (statusError) throw statusError;
 
       setNotice("Treatment completed and invoice generated automatically.");
+      return true;
     } catch (reason) {
       const message =
         reason instanceof Error ? reason.message : "Complete treatment failed.";
       setNotice("Treatment completion failed");
       setError(message);
+      return false;
     }
   }
 
@@ -600,7 +602,7 @@ function Patients({
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
   onHandoverToDentist: (appointmentId: string) => void;
-  onCompleteTreatment: (appointmentId: string) => void;
+  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -690,10 +692,14 @@ function Patients({
           return;
         }
 
-        const next = (data ?? []).find(
-          (appointment) =>
-            appointment.status === "in_progress",
+        const activeAppointments = (data ?? []).filter(
+          (appointment) => !["completed", "cancelled", "no_show"].includes(appointment.status),
         );
+
+        const next =
+          activeAppointments.find((appointment) => appointment.status === "in_progress") ??
+          activeAppointments[0] ??
+          null;
 
         if (!next) {
           setUpcomingAppointment(null);
@@ -1203,7 +1209,13 @@ function Patients({
                         <button
                           type="button"
                           className="classic-button primary"
-                          onClick={() => onCompleteTreatment(upcomingAppointment.id)}
+                          onClick={async () => {
+                            const completed = await onCompleteTreatment(upcomingAppointment.id);
+                            if (completed) {
+                              setAppointmentSessionId(null);
+                              setUpcomingAppointment(null);
+                            }
+                          }}
                           disabled={upcomingAppointment.status === "completed"}
                         >
                           Complete treatment
@@ -1608,7 +1620,7 @@ function Appointments({
   setNotice: (message: string) => void;
   onCheckIn: (appointmentId: string) => void;
   onHandoverToDentist: (appointmentId: string) => void;
-  onCompleteTreatment: (appointmentId: string) => void;
+  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
 }) {
   const [items, setItems] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -1903,7 +1915,19 @@ function Appointments({
                         <button
                           type="button"
                           className="classic-button primary"
-                          onClick={() => onCompleteTreatment(item.id)}
+                          onClick={async () => {
+                            const completed = await onCompleteTreatment(item.id);
+                            if (completed) {
+                              setExpandedActionId(null);
+                              setItems((current) =>
+                                current.map((appointment) =>
+                                  appointment.id === item.id
+                                    ? { ...appointment, status: "completed" }
+                                    : appointment,
+                                ),
+                              );
+                            }
+                          }}
                           disabled={item.status === "completed"}
                         >
                           Complete treatment
@@ -1972,7 +1996,19 @@ function Appointments({
                   <button
                     type="button"
                     className="classic-button primary"
-                    onClick={() => onCompleteTreatment(selectedAppointment.id)}
+                    onClick={async () => {
+                      const completed = await onCompleteTreatment(selectedAppointment.id);
+                      if (completed) {
+                        setSelectedAppointmentId(null);
+                        setItems((current) =>
+                          current.map((appointment) =>
+                            appointment.id === selectedAppointment.id
+                              ? { ...appointment, status: "completed" }
+                              : appointment,
+                          ),
+                        );
+                      }
+                    }}
                     disabled={selectedAppointment.status === "completed"}
                   >
                     Complete treatment
@@ -2148,7 +2184,7 @@ function PatientCaseWorkspace({
   patient: Patient | null;
   caseTab: CaseTab;
   setCaseTab: (value: CaseTab) => void;
-  onCompleteTreatment: (appointmentId: string) => void;
+  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
   upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; notes: string | null; provider_name: string | null } | null;
   setNotice: (message: string) => void;
 }) {
