@@ -848,7 +848,9 @@ function Patients({
                     className={
                       selected?.id === patient.id ? "selected-row" : ""
                     }
-                    onClick={() => setSelected(patient)}
+                    onClick={() =>
+                      setSelected(selected?.id === patient.id ? null : patient)
+                    }
                   >
                     <td>{patient.patient_number}</td>
                     <td>
@@ -901,147 +903,162 @@ function Patients({
         )}
       </section>
       {selected && (
-        <div className="patient-detail-page">
-          <section className="panel patient-summary">
-            <div className="patient-summary-header">
-              <div>
-                <span className="patient-record-kicker">Patient Record</span>
-                <h2>{selected.first_name} {selected.last_name}</h2>
-              </div>
-              <div className="patient-summary-meta">
-                <span className="status-badge active">{selected.is_active ? "Active" : "Inactive"}</span>
-                <span className="record-chip">#{selected.patient_number}</span>
-              </div>
-            </div>
-            <div className="patient-grid">
-              <div>
-                <span>Patient number</span>
-                <strong className="patient-name">{selected.patient_number}</strong>
-              </div>
-              <div>
-                <span>Full name</span>
-                <strong className="patient-name">
-                  {selected.first_name} {selected.last_name}
-                </strong>
-              </div>
-              <div>
-                <span>Date of birth</span>
-                <strong>{selected.date_of_birth}</strong>
-              </div>
-              <div>
-                <span>Telephone</span>
-                <strong>{selected.phone ?? "-"}</strong>
-              </div>
-              <div>
-                <span>Email</span>
-                <strong>{selected.email ?? "-"}</strong>
-              </div>
-              <div>
-                <span>Status</span>
-                <span className="status-badge active">
-                  {selected.is_active ? "Active" : "Inactive"}
-                </span>
-              </div>
-            </div>
-            {upcomingAppointment && (
-              <div className="checkin-card">
+        <div className="patient-detail-overlay" role="dialog" aria-modal="true">
+          <div className="patient-detail-page">
+            <button
+              type="button"
+              className="patient-close"
+              onClick={() => setSelected(null)}
+              aria-label="Close patient record"
+            >
+              ×
+            </button>
+
+            <section className="panel patient-summary">
+              <div className="patient-summary-header">
                 <div>
-                  <span>Next appointment</span>
-                  <strong>
-                    {upcomingAppointment.appointment_type} · {upcomingAppointment.appointment_date}
-                  </strong>
-                  <small>
-                    {upcomingAppointment.appointment_time}
-                    {upcomingAppointment.provider_name ? ` · ${upcomingAppointment.provider_name}` : ""}
-                  </small>
+                  <span className="patient-record-kicker">Patient Record</span>
+                  <h2>
+                    {selected.first_name} {selected.last_name}
+                  </h2>
                 </div>
-                <div className="checkin-aside">
-                  <span className="status-badge">
-                    {appointmentStatusLabel(upcomingAppointment.status)}
+                <div className="patient-summary-meta">
+                  <span className="status-badge active">
+                    {selected.is_active ? "Active" : "Inactive"}
                   </span>
-                  <button
-                    type="button"
-                    className="classic-button primary"
-                    onClick={() => void checkInPatientAppointment(upcomingAppointment.id)}
-                    disabled={upcomingAppointment.status === "in_progress"}
-                  >
-                    {upcomingAppointment.status === "in_progress" ? "Ready for dentist" : "Check in"}
-                  </button>
+                  <span className="record-chip">#{selected.patient_number}</span>
                 </div>
               </div>
-            )}
-            <div className="dialog-actions" style={{ marginTop: "1rem" }}>
-              <button
-                type="button"
-                className="classic-button primary"
-                onClick={() => void sendPortalLink(selected)}
-              >
-                Send Portal Link
-              </button>
-              <button
-                type="button"
-                className="classic-button"
-                onClick={() => void copyPortalLink(selected)}
-              >
-                Copy Portal Link
-              </button>
-            </div>
-          </section>
-
-          <PatientCaseWorkspace
-            patient={selected}
-            caseTab={caseTab}
-            setCaseTab={setCaseTab}
-            chatMessages={chatMessages}
-            setChatMessages={setChatMessages}
-            chatDraft={chatDraft}
-            setChatDraft={setChatDraft}
-            onCheckIn={checkInPatientAppointment}
-            upcomingAppointment={upcomingAppointment}
-          />
-
-          <div className="patient-detail-sections">
-            <DentalChart patient={selected} setNotice={setNotice} />
-            <Treatments patient={selected} setNotice={setNotice} />
-          </div>
-
-          <section className="panel patient-files">
-            <div className="panel-title">Patient Files</div>
-            {filesLoading ? (
-              <div className="empty-state">Loading uploaded files...</div>
-            ) : patientFiles.length === 0 ? (
-              <div className="empty-state">
-                No files uploaded for this patient yet.
+              <div className="patient-grid">
+                <div>
+                  <span>Patient number</span>
+                  <strong className="patient-name">{selected.patient_number}</strong>
+                </div>
+                <div>
+                  <span>Full name</span>
+                  <strong className="patient-name">
+                    {selected.first_name} {selected.last_name}
+                  </strong>
+                </div>
+                <div>
+                  <span>Date of birth</span>
+                  <strong>{selected.date_of_birth}</strong>
+                </div>
+                <div>
+                  <span>Telephone</span>
+                  <strong>{selected.phone ?? "-"}</strong>
+                </div>
+                <div>
+                  <span>Email</span>
+                  <strong>{selected.email ?? "-"}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <span className="status-badge active">
+                    {selected.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <div className="document-list">
-                {patientFiles.map((file) => (
-                  <div className="document-item" key={`${file.bucket}-${file.id}`}>
-                    <div className="document-meta">
-                      <strong>{file.file_name}</strong>
-                      <small>
-                        {file.label} · {new Date(file.uploaded_at).toLocaleString()}
-                      </small>
-                    </div>
-                    <div className="document-actions">
-                      {file.signedUrl ? (
-                        <a
-                          href={file.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="classic-button"
-                        >
-                          Open
-                        </a>
-                      ) : (
-                        <span className="file-unavailable">Unavailable</span>
-                      )}
-                    </div>
+              {upcomingAppointment && (
+                <div className="checkin-card">
+                  <div>
+                    <span>Next appointment</span>
+                    <strong>
+                      {upcomingAppointment.appointment_type} · {upcomingAppointment.appointment_date}
+                    </strong>
+                    <small>
+                      {upcomingAppointment.appointment_time}
+                      {upcomingAppointment.provider_name ? ` · ${upcomingAppointment.provider_name}` : ""}
+                    </small>
                   </div>
-                ))}
+                  <div className="checkin-aside">
+                    <span className="status-badge">
+                      {appointmentStatusLabel(upcomingAppointment.status)}
+                    </span>
+                    <button
+                      type="button"
+                      className="classic-button primary"
+                      onClick={() => void checkInPatientAppointment(upcomingAppointment.id)}
+                      disabled={upcomingAppointment.status === "in_progress"}
+                    >
+                      {upcomingAppointment.status === "in_progress" ? "Ready for dentist" : "Check in"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="dialog-actions" style={{ marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  onClick={() => void sendPortalLink(selected)}
+                >
+                  Send Portal Link
+                </button>
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => void copyPortalLink(selected)}
+                >
+                  Copy Portal Link
+                </button>
               </div>
-            )}
-          </section>
+            </section>
+
+            <PatientCaseWorkspace
+              patient={selected}
+              caseTab={caseTab}
+              setCaseTab={setCaseTab}
+              chatMessages={chatMessages}
+              setChatMessages={setChatMessages}
+              chatDraft={chatDraft}
+              setChatDraft={setChatDraft}
+              onCheckIn={checkInPatientAppointment}
+              upcomingAppointment={upcomingAppointment}
+            />
+
+            <div className="patient-detail-sections">
+              <DentalChart patient={selected} setNotice={setNotice} />
+              <Treatments patient={selected} setNotice={setNotice} />
+            </div>
+
+            <section className="panel patient-files">
+              <div className="panel-title">Patient Files</div>
+              {filesLoading ? (
+                <div className="empty-state">Loading uploaded files...</div>
+              ) : patientFiles.length === 0 ? (
+                <div className="empty-state">
+                  No files uploaded for this patient yet.
+                </div>
+              ) : (
+                <div className="document-list">
+                  {patientFiles.map((file) => (
+                    <div className="document-item" key={`${file.bucket}-${file.id}`}>
+                      <div className="document-meta">
+                        <strong>{file.file_name}</strong>
+                        <small>
+                          {file.label} · {new Date(file.uploaded_at).toLocaleString()}
+                        </small>
+                      </div>
+                      <div className="document-actions">
+                        {file.signedUrl ? (
+                          <a
+                            href={file.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="classic-button"
+                          >
+                            Open
+                          </a>
+                        ) : (
+                          <span className="file-unavailable">Unavailable</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
       )}
       {showAdd && (

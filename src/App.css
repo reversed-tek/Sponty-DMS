@@ -21,12 +21,14 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .document-actions { display: flex; align-items: center; }
 .document-actions a { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .file-unavailable { padding: 3px 6px; color: #6a5c4b; background: #fce7b5; border: 1px solid #d2af4e; }
-.patient-detail-page { display: grid; gap: 12px; }
-.patient-summary-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 18px 12px; background: linear-gradient(135deg, var(--brand-blue-dark) 0%, #0f3f68 100%); border-bottom: 3px solid #7bbaf4; }
-.patient-record-kicker { display: inline-block; color: #dfeeff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: bold; }
-.patient-summary-header h2 { margin: 6px 0 0; color: #fff; font-size: clamp(1.8rem, 3vw, 2.5rem); line-height: 1.1; }
+.patient-detail-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 28px; background: rgba(19, 32, 45, 0.52); overflow: auto; }
+.patient-detail-page { width: min(1200px, 100%); max-height: calc(100vh - 56px); display: grid; gap: 12px; padding: 12px; overflow: auto; background: #d4d0c8; border: 2px solid; border-color: #fff #808080 #808080 #fff; box-shadow: 6px 6px 0 rgba(38, 49, 59, 0.4); }
+.patient-close { justify-self: end; width: 34px; height: 34px; border: 2px solid; border-color: #fff #404040 #404040 #fff; background: #dfe3e8; color: #000; font-size: 22px; line-height: 1; cursor: pointer; }
+.patient-summary-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 16px 10px; background: linear-gradient(135deg, var(--brand-blue-dark) 0%, #0f3f68 100%); border-bottom: 2px solid #7bbaf4; }
+.patient-record-kicker { display: inline-block; color: #dfeeff; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: bold; }
+.patient-summary-header h2 { margin: 5px 0 0; color: #fff; font-size: clamp(1.35rem, 2vw, 1.85rem); line-height: 1.15; }
 .patient-summary-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.record-chip { display: inline-flex; align-items: center; padding: 5px 9px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.12); color: #fff; font-weight: bold; }
+.record-chip { display: inline-flex; align-items: center; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.12); color: #fff; font-weight: bold; font-size: 12px; }
 .patient-detail-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .checkin-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 12px; background: #dcecff; border: 1px solid #9fb9d8; }
 .checkin-card > div { display: grid; gap: 3px; }
