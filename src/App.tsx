@@ -13,8 +13,6 @@ type Page =
   | "Dashboard"
   | "Patients"
   | "Appointments"
-  | "Clinical Records"
-  | "Dental Chart"
   | "Treatments"
   | "Billing"
   | "Reports"
@@ -57,8 +55,6 @@ const navItems: Page[] = [
   "Dashboard",
   "Patients",
   "Appointments",
-  "Clinical Records",
-  "Dental Chart",
   "Treatments",
   "Billing",
   "Reports",
@@ -76,6 +72,20 @@ const roleLabel = (role: string) =>
     : role === "dentist"
       ? "Dentist"
       : "Receptionist";
+const appointmentStatusLabel = (status: string) =>
+  status === "in_progress"
+    ? "In progress"
+    : status === "scheduled"
+      ? "Scheduled"
+      : status === "completed"
+        ? "Completed"
+        : status === "cancelled"
+          ? "Cancelled"
+          : status === "no_show"
+            ? "No show"
+            : status === "confirmed"
+              ? "Confirmed"
+              : "Scheduled";
 
 function App() {
   const [page, setPage] = useState<Page>("Dashboard");
@@ -269,12 +279,6 @@ function App() {
             />
           )}
           {page === "Appointments" && <Appointments setNotice={setNotice} />}
-          {page === "Clinical Records" && (
-            <ClinicalRecords selected={selectedPatient} />
-          )}
-          {page === "Dental Chart" && (
-            <DentalChart patient={selectedPatient} setNotice={setNotice} />
-          )}
           {page === "Treatments" && (
             <Treatments patient={selectedPatient} setNotice={setNotice} />
           )}
@@ -405,6 +409,20 @@ function Patients({
       signedUrl: string | null;
     }>
   >([]);
+  const [upcomingAppointment, setUpcomingAppointment] = useState<{
+    id: string;
+    appointment_date: string;
+    appointment_time: string;
+    appointment_type: string;
+    status: string;
+    reason: string | null;
+    provider_name: string | null;
+  } | null>(null);
+  const [caseTab, setCaseTab] = useState<"clinical" | "chat">("clinical");
+  const [chatMessages, setChatMessages] = useState<
+    Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>
+  >([]);
+  const [chatDraft, setChatDraft] = useState("");
   const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
@@ -437,6 +455,55 @@ function Patients({
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (!supabase || !selected) {
+      setUpcomingAppointment(null);
+      setChatMessages([]);
+      return;
+    }
+
+    supabase
+      .from("appointments")
+      .select(
+        "id, appointment_date, appointment_time, appointment_type, status, reason, profiles:provider_id(full_name)",
+      )
+      .eq("patient_id", selected.id)
+      .order("appointment_date", { ascending: true })
+      .order("appointment_time", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          setUpcomingAppointment(null);
+          return;
+        }
+
+        const next = (data ?? []).find((appointment) => appointment.appointment_date >= new Date().toISOString().slice(0, 10));
+        if (!next) {
+          setUpcomingAppointment(null);
+          return;
+        }
+
+        const provider = next.profiles as unknown as { full_name: string } | null;
+        setUpcomingAppointment({
+          id: next.id,
+          appointment_date: next.appointment_date,
+          appointment_time: next.appointment_time,
+          appointment_type: next.appointment_type,
+          status: next.status,
+          reason: next.reason,
+          provider_name: provider?.full_name ?? null,
+        });
+      });
+
+    setChatMessages([
+      {
+        id: `${selected.id}-welcome`,
+        author: "assistant",
+        text: `Ready for ${selected.first_name} ${selected.last_name}. Review the treatment plan and check the patient in before the dentist sees them.`,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+    ]);
+  }, [selected]);
 
   useEffect(() => {
     const client = supabase;
@@ -692,6 +759,52 @@ function Patients({
     }
   }
 
+  async function checkInPatientAppointment(appointmentId: string) {
+    if (!supabase || !selected) return;
+
+    try {
+      const { data: appointment, error: fetchError } = await supabase
+        .from("appointments")
+        .select("id, patient_id, appointment_date, appointment_time, appointment_type, status")
+        .eq("id", appointmentId)
+        .single();
+
+      if (fetchError || !appointment) throw new Error(fetchError?.message ?? "Appointment not found.");
+
+      const { error: updateError } = await supabase
+        .from("appointments")
+        .update({ status: "in_progress" })
+        .eq("id", appointmentId);
+
+      if (updateError) throw updateError;
+
+      const { data: auth } = await supabase.auth.getUser();
+      const { error: treatmentError } = await supabase.from("treatments").insert({
+        patient_id: appointment.patient_id,
+        treatment_date: appointment.appointment_date,
+        procedure_name: appointment.appointment_type,
+        status: "in_progress",
+        notes: `Prepared for dentist from appointment at ${appointment.appointment_time}.`,
+        provider_id: auth.user?.id,
+        created_by: auth.user?.id,
+      });
+
+      if (treatmentError) throw treatmentError;
+
+      setUpcomingAppointment((current) =>
+        current && current.id === appointmentId
+          ? { ...current, status: "in_progress" }
+          : current,
+      );
+      setNotice("Patient checked in and treatment prepared for the dentist.");
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : "Patient check-in failed.";
+      setError(message);
+      setNotice("Check-in failed");
+    }
+  }
+
   return (
     <div className="content-stack">
       <section className="panel">
@@ -788,12 +901,23 @@ function Patients({
         )}
       </section>
       {selected && (
-        <>
+        <div className="patient-detail-page">
           <section className="panel patient-summary">
-            <div className="panel-title">
-              Patient Summary <span>Record {selected.patient_number}</span>
+            <div className="patient-summary-header">
+              <div>
+                <span className="patient-record-kicker">Patient Record</span>
+                <h2>{selected.first_name} {selected.last_name}</h2>
+              </div>
+              <div className="patient-summary-meta">
+                <span className="status-badge active">{selected.is_active ? "Active" : "Inactive"}</span>
+                <span className="record-chip">#{selected.patient_number}</span>
+              </div>
             </div>
             <div className="patient-grid">
+              <div>
+                <span>Patient number</span>
+                <strong className="patient-name">{selected.patient_number}</strong>
+              </div>
               <div>
                 <span>Full name</span>
                 <strong className="patient-name">
@@ -809,12 +933,43 @@ function Patients({
                 <strong>{selected.phone ?? "-"}</strong>
               </div>
               <div>
+                <span>Email</span>
+                <strong>{selected.email ?? "-"}</strong>
+              </div>
+              <div>
                 <span>Status</span>
                 <span className="status-badge active">
                   {selected.is_active ? "Active" : "Inactive"}
                 </span>
               </div>
             </div>
+            {upcomingAppointment && (
+              <div className="checkin-card">
+                <div>
+                  <span>Next appointment</span>
+                  <strong>
+                    {upcomingAppointment.appointment_type} · {upcomingAppointment.appointment_date}
+                  </strong>
+                  <small>
+                    {upcomingAppointment.appointment_time}
+                    {upcomingAppointment.provider_name ? ` · ${upcomingAppointment.provider_name}` : ""}
+                  </small>
+                </div>
+                <div className="checkin-aside">
+                  <span className="status-badge">
+                    {appointmentStatusLabel(upcomingAppointment.status)}
+                  </span>
+                  <button
+                    type="button"
+                    className="classic-button primary"
+                    onClick={() => void checkInPatientAppointment(upcomingAppointment.id)}
+                    disabled={upcomingAppointment.status === "in_progress"}
+                  >
+                    {upcomingAppointment.status === "in_progress" ? "Ready for dentist" : "Check in"}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="dialog-actions" style={{ marginTop: "1rem" }}>
               <button
                 type="button"
@@ -832,6 +987,24 @@ function Patients({
               </button>
             </div>
           </section>
+
+          <PatientCaseWorkspace
+            patient={selected}
+            caseTab={caseTab}
+            setCaseTab={setCaseTab}
+            chatMessages={chatMessages}
+            setChatMessages={setChatMessages}
+            chatDraft={chatDraft}
+            setChatDraft={setChatDraft}
+            onCheckIn={checkInPatientAppointment}
+            upcomingAppointment={upcomingAppointment}
+          />
+
+          <div className="patient-detail-sections">
+            <DentalChart patient={selected} setNotice={setNotice} />
+            <Treatments patient={selected} setNotice={setNotice} />
+          </div>
+
           <section className="panel patient-files">
             <div className="panel-title">Patient Files</div>
             {filesLoading ? (
@@ -869,7 +1042,7 @@ function Patients({
               </div>
             )}
           </section>
-        </>
+        </div>
       )}
       {showAdd && (
         <div className="modal-backdrop">
@@ -1097,7 +1270,27 @@ function Appointments({ setNotice }: { setNotice: (message: string) => void }) {
   );
 }
 
-function ClinicalRecords({ selected }: { selected: Patient | null }) {
+function PatientCaseWorkspace({
+  patient,
+  caseTab,
+  setCaseTab,
+  chatMessages,
+  setChatMessages,
+  chatDraft,
+  setChatDraft,
+  onCheckIn,
+  upcomingAppointment,
+}: {
+  patient: Patient | null;
+  caseTab: "clinical" | "chat";
+  setCaseTab: (value: "clinical" | "chat") => void;
+  chatMessages: Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>;
+  setChatMessages: React.Dispatch<React.SetStateAction<Array<{ id: string; author: "assistant" | "staff"; text: string; time: string }>>>;
+  chatDraft: string;
+  setChatDraft: (value: string) => void;
+  onCheckIn: (appointmentId: string) => void;
+  upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; provider_name: string | null } | null;
+}) {
   const [notes, setNotes] = useState<
     Array<{
       id: string;
@@ -1117,97 +1310,117 @@ function ClinicalRecords({ selected }: { selected: Patient | null }) {
       severity: string | null;
     }>
   >([]);
-  const [tab, setTab] = useState("Notes");
+
   useEffect(() => {
-    if (!supabase || !selected) return;
+    if (!supabase || !patient) return;
+
     Promise.all([
       supabase
         .from("clinical_notes")
         .select("id, note_date, visit_type, subjective, assessment, plan")
-        .eq("patient_id", selected.id)
+        .eq("patient_id", patient.id)
         .order("note_date", { ascending: false }),
       supabase
         .from("medical_history")
         .select("id, record_type, name, detail, severity")
-        .eq("patient_id", selected.id)
+        .eq("patient_id", patient.id)
         .order("created_at", { ascending: false }),
     ]).then(([notesResult, historyResult]) => {
       setNotes(notesResult.data ?? []);
       setHistory(historyResult.data ?? []);
     });
-  }, [selected]);
-  if (!selected)
-    return (
-      <section className="panel">
-        <div className="empty-state">
-          Select a patient first to view clinical records.
-        </div>
-      </section>
-    );
+  }, [patient]);
+
+  const sendChatMessage = () => {
+    if (!chatDraft.trim() || !patient) return;
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const nextMessage = { id: `${patient.id}-${Date.now()}`, author: "staff" as const, text: chatDraft.trim(), time };
+    setChatMessages((current) => [...current, nextMessage]);
+    setChatDraft("");
+    setTimeout(() => {
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: `${patient.id}-${Date.now()}-assistant`,
+          author: "assistant",
+          text: `Logged for ${patient.first_name} ${patient.last_name}. Review the clinical note and treatment prep before the dentist starts.`,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    }, 150);
+  };
+
   return (
-    <section className="panel record-panel">
+    <section className="panel patient-case-workspace">
       <div className="panel-title">
-        Clinical Records{" "}
-        <span>
-          {selected.first_name} {selected.last_name}
-        </span>
+        Patient Case Workspace
+        <span>{patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}</span>
       </div>
       <div className="tab-strip">
-        <button
-          type="button"
-          className={tab === "Notes" ? "tab active" : "tab"}
-          onClick={() => setTab("Notes")}
-        >
-          Notes
-        </button>
-        <button
-          type="button"
-          className={tab === "History" ? "tab active" : "tab"}
-          onClick={() => setTab("History")}
-        >
-          Medical History
-        </button>
+        <button type="button" className={caseTab === "clinical" ? "tab active" : "tab"} onClick={() => setCaseTab("clinical")}>Clinical Records</button>
+        <button type="button" className={caseTab === "chat" ? "tab active" : "tab"} onClick={() => setCaseTab("chat")}>Dental Chat</button>
       </div>
-      {tab === "Notes" ? (
-        <div className="note-list">
-          {notes.map((note) => (
-            <article className="note-entry" key={note.id}>
-              <div className="note-meta">
-                <strong>{note.note_date}</strong>
-                <span>{note.visit_type}</span>
+
+      {caseTab === "clinical" ? (
+        <div className="patient-case-body">
+          <div className="case-summary-row">
+            {upcomingAppointment ? (
+              <div className="case-appointment-box">
+                <span>Ready for dentist</span>
+                <strong>{upcomingAppointment.appointment_type}</strong>
+                <small>
+                  {upcomingAppointment.appointment_date} · {upcomingAppointment.appointment_time}
+                </small>
+                <button type="button" className="classic-button primary" onClick={() => onCheckIn(upcomingAppointment.id)} disabled={upcomingAppointment.status === "in_progress"}>
+                  {upcomingAppointment.status === "in_progress" ? "Already checked in" : "Check in"}
+                </button>
               </div>
-              <h3>Clinical note</h3>
-              <p>
-                {note.assessment ||
-                  note.subjective ||
-                  note.plan ||
-                  "No note text recorded."}
-              </p>
-            </article>
-          ))}
-          {!notes.length && (
-            <div className="empty-state">
-              No clinical notes found for this patient.
+            ) : (
+              <div className="case-appointment-box empty-box">
+                <span>No upcoming visit</span>
+                <small>Schedule an appointment to prep the treatment flow.</small>
+              </div>
+            )}
+          </div>
+          <div className="case-columns">
+            <div className="case-column">
+              <h3>Clinical notes</h3>
+              {notes.length ? notes.slice(0, 3).map((note) => (
+                <article className="case-note" key={note.id}>
+                  <div className="note-meta"><strong>{note.note_date}</strong><span>{note.visit_type}</span></div>
+                  <p>{note.assessment || note.subjective || note.plan || "No detailed note recorded."}</p>
+                </article>
+              )) : <div className="empty-state">No clinical notes on record.</div>}
             </div>
-          )}
+            <div className="case-column">
+              <h3>Medical history</h3>
+              {history.length ? history.slice(0, 4).map((entry) => (
+                <div className="case-history-item" key={entry.id}>
+                  <strong>{entry.name}</strong>
+                  <small>{entry.record_type}</small>
+                  <span>{entry.severity ?? "Active"}</span>
+                </div>
+              )) : <div className="empty-state">No medical history recorded.</div>}
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="history-list">
-          {history.map((entry) => (
-            <div className="history-entry" key={entry.id}>
-              <span className="history-kind">{entry.record_type}</span>
-              <div>
-                <strong>{entry.name}</strong>
-                <small>{entry.detail ?? "No details recorded"}</small>
+        <div className="patient-case-body chat-panel">
+          <div className="chat-thread">
+            {chatMessages.map((message) => (
+              <div key={message.id} className={message.author === "assistant" ? "chat-message assistant" : "chat-message staff"}>
+                <div className="chat-header">
+                  <strong>{message.author === "assistant" ? "Assistant" : "Clinic"}</strong>
+                  <span>{message.time}</span>
+                </div>
+                <p>{message.text}</p>
               </div>
-              <span className="severity">{entry.severity ?? "Active"}</span>
-            </div>
-          ))}
-          {!history.length && (
-            <div className="empty-state">
-              No medical history found for this patient.
-            </div>
-          )}
+            ))}
+          </div>
+          <div className="chat-compose">
+            <textarea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="Add a treatment handoff note for the dentist..." />
+            <button type="button" className="classic-button primary" onClick={sendChatMessage}>Send</button>
+          </div>
         </div>
       )}
     </section>
