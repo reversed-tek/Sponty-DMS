@@ -1339,6 +1339,8 @@ function Appointments({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "" });
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [form, setForm] = useState({ patient_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   useEffect(() => {
@@ -1422,6 +1424,40 @@ function Appointments({
       );
     }
   }
+
+  const selectedAppointment = items.find((item) => item.id === selectedAppointmentId) ?? null;
+
+  async function saveAppointmentDetails() {
+    if (!supabase || !selectedAppointmentId) return;
+
+    const reason = detailDraft.reason.trim();
+    const notes = detailDraft.notes.trim();
+
+    const { error } = await supabase
+      .from("appointments")
+      .update({
+        reason: reason || null,
+        notes: notes || null,
+      })
+      .eq("id", selectedAppointmentId);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setItems((current) =>
+      current.map((appointment) =>
+        appointment.id === selectedAppointmentId
+          ? { ...appointment, reason: reason || null, notes: notes || null }
+          : appointment,
+      ),
+    );
+    setSelectedAppointmentId(null);
+    setDetailDraft({ reason: "", notes: "" });
+    setNotice("Appointment details saved");
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">Appointment Calendar <button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ New Appointment</button></div>
@@ -1461,6 +1497,16 @@ function Appointments({
                   onClick={() => sync(item)}
                 >
                   {item.outlook_event_id ? "Synced" : "Sync Outlook"}
+                </button>
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => {
+                    setSelectedAppointmentId(item.id);
+                    setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "" });
+                  }}
+                >
+                  Open
                 </button>
                 <button
                   type="button"
@@ -1507,6 +1553,51 @@ function Appointments({
         </div>
       )}
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
+      {selectedAppointment && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              {selectedAppointment.patient_name}
+              <button type="button" onClick={() => setSelectedAppointmentId(null)}>X</button>
+            </div>
+            <div className="dialog-body appointment-detail-body">
+              <div className="appointment-detail-meta">
+                <span>{selectedAppointment.appointment_date}</span>
+                <span>{selectedAppointment.appointment_time}</span>
+                <span>{selectedAppointment.appointment_type}</span>
+              </div>
+              <label>
+                Chief complaint
+                <input
+                  value={detailDraft.reason}
+                  onChange={(event) =>
+                    setDetailDraft((current) => ({ ...current, reason: event.target.value }))
+                  }
+                  placeholder="e.g. Tooth pain on upper right molar"
+                />
+              </label>
+              <label>
+                Assistant notes
+                <textarea
+                  value={detailDraft.notes}
+                  onChange={(event) =>
+                    setDetailDraft((current) => ({ ...current, notes: event.target.value }))
+                  }
+                  placeholder="Add clinical observations, symptoms, or follow-up notes"
+                />
+              </label>
+              <div className="dialog-actions">
+                <button type="button" className="classic-button" onClick={() => setSelectedAppointmentId(null)}>
+                  Cancel
+                </button>
+                <button type="button" className="classic-button primary" onClick={saveAppointmentDetails}>
+                  Save details
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
       {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Appointment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><label>Patient<select value={form.patient_id} onChange={(event) => setForm({ ...form, patient_id: event.target.value })}><option value="">Select patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name} ({patient.patient_number})</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
     </section>
   );

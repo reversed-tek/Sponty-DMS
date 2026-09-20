@@ -69,6 +69,9 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .appointment-action-group { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .appointment-clinic-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; grid-column: 1 / -1; margin-top: 4px; padding-left: 4px; }
 .appointment-action-toggle { justify-self: start; }
+.appointment-detail-body { display: grid; gap: 12px; min-width: min(520px, 94vw); }
+.appointment-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; color: var(--brand-blue-dark); }
+.appointment-detail-meta span { padding: 3px 8px; background: #edf4ff; border: 1px solid #bfd2ee; }
 .settings-panel { max-width: 900px; }.settings-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; }.settings-form label { display: grid; gap: 3px; }.settings-actions { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; }.settings-actions .send-success { margin: 0; }
 @media (max-width: 560px) { #root { padding: 0; }.workspace { display: block; }.sidebar { width: 100%; padding: 5px; border-right: 0; border-bottom: 1px solid #808080; }.sidebar nav { display: grid; grid-template-columns: repeat(2, 1fr); }.sidebar-section, .sidebar-note { display: none; }.main-panel { padding: 8px; }.toolbar { overflow-x: auto; }.filter-row { align-items: stretch; flex-wrap: wrap; }.filter-row .classic-button { margin-left: 0; }.patient-grid { grid-template-columns: 1fr 1fr; }.schedule-row { grid-template-columns: 65px 1fr; }.schedule-row .status-badge { grid-column: 2; }.appointment-row { grid-template-columns: 72px 1fr; }.appointment-row .status-badge, .appointment-row .classic-button, .appointment-row .calendar-sync { grid-column: 2; justify-self: start; }.settings-form { grid-template-columns: 1fr; }.status-right { display: none; } }
 
