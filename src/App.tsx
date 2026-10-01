@@ -1924,7 +1924,7 @@ function Appointments({
                         )}
                       <small className="appointment-workflow-meta">
                         {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)} · awaiting payment`
+                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
                           : item.clinical_updated_at
                             ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
                             : item.handed_over_at
@@ -1982,18 +1982,7 @@ function Appointments({
                         <button
                           type="button"
                           className="classic-button"
-                          onClick={async () => {
-                            const checkedIn = await onCheckIn(item.id);
-                            if (checkedIn) {
-                              setItems((current) =>
-                                current.map((appointment) =>
-                                  appointment.id === item.id
-                                    ? { ...appointment, status: "confirmed" }
-                                    : appointment,
-                                ),
-                              );
-                            }
-                          }}
+                          onClick={() => void runCheckIn(item)}
                           disabled={!['scheduled', 'booked'].includes(item.status)}
                         >
                           {item.status === "confirmed" || item.status === "in_progress" ? "Checked in" : "Check in"}
@@ -2001,18 +1990,7 @@ function Appointments({
                         <button
                           type="button"
                           className="classic-button"
-                          onClick={async () => {
-                            const handedOver = await onHandoverToDentist(item.id);
-                            if (handedOver) {
-                              setItems((current) =>
-                                current.map((appointment) =>
-                                  appointment.id === item.id
-                                    ? { ...appointment, status: "in_progress" }
-                                    : appointment,
-                                ),
-                              );
-                            }
-                          }}
+                          onClick={() => void runHandover(item)}
                           disabled={item.status !== "confirmed"}
                         >
                           Handover to dentist
@@ -2056,7 +2034,7 @@ function Appointments({
                         )}
                       <small className="appointment-workflow-meta">
                         {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)} · awaiting payment`
+                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
                           : item.clinical_updated_at
                             ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
                             : item.handed_over_at
@@ -2090,6 +2068,38 @@ function Appointments({
         </div>
       )}
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
+
+      {workflowConfirmation && (
+        <div className="modal-backdrop workflow-confirmation-backdrop">
+          <section className="classic-dialog workflow-confirmation-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              {workflowConfirmation.title}
+              <button type="button" onClick={() => setWorkflowConfirmation(null)}>X</button>
+            </div>
+            <div className="dialog-body">
+              <div className="workflow-confirmation-icon">✓</div>
+              <div className="workflow-confirmation-copy">
+                <h3>{workflowConfirmation.patientName}</h3>
+                <p>
+                  <strong>Time:</strong>{" "}
+                  {new Date(workflowConfirmation.time).toLocaleString()}
+                </p>
+                <p>{workflowConfirmation.detail}</p>
+              </div>
+              <div className="dialog-actions workflow-confirmation-actions">
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  onClick={() => setWorkflowConfirmation(null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
       {selectedAppointment && (
         <div className="modal-backdrop">
           <section className="classic-dialog" role="dialog" aria-modal="true">
@@ -2104,24 +2114,34 @@ function Appointments({
                 <span>{selectedAppointment.appointment_type}</span>
               </div>
 
+              <div className="appointment-workflow-card">
+                <strong>Current workflow</strong>
+                <span>
+                  {selectedAppointment.treatment_completed_at
+                    ? `Treatment complete ${formatWorkflowTime(selectedAppointment.treatment_completed_at)}${selectedAppointment.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
+                    : selectedAppointment.clinical_updated_at
+                      ? `Dentist activity ${formatWorkflowTime(selectedAppointment.clinical_updated_at)}`
+                      : selectedAppointment.handed_over_at
+                        ? `Ready for dentist since ${formatWorkflowTime(selectedAppointment.handed_over_at)}`
+                        : selectedAppointment.checked_in_at
+                          ? `Checked in ${formatWorkflowTime(selectedAppointment.checked_in_at)} · waiting for handover`
+                          : "Not checked in"}
+                </span>
+                {selectedAppointment.checked_in_at && (
+                  <small>Checked in: {new Date(selectedAppointment.checked_in_at).toLocaleString()}</small>
+                )}
+                {selectedAppointment.handed_over_at && (
+                  <small>Handed over: {new Date(selectedAppointment.handed_over_at).toLocaleString()}</small>
+                )}
+              </div>
+
               <div className="appointment-session-panel">
                 <h3>Dentist session</h3>
                 <div className="appointment-session-actions">
                   <button
                     type="button"
                     className="classic-button"
-                    onClick={async () => {
-                      const checkedIn = await onCheckIn(selectedAppointment.id);
-                      if (checkedIn) {
-                        setItems((current) =>
-                          current.map((appointment) =>
-                            appointment.id === selectedAppointment.id
-                              ? { ...appointment, status: "confirmed" }
-                              : appointment,
-                          ),
-                        );
-                      }
-                    }}
+                    onClick={() => void runCheckIn(selectedAppointment)}
                     disabled={!['scheduled', 'booked'].includes(selectedAppointment.status)}
                   >
                     {selectedAppointment.status === "confirmed" || selectedAppointment.status === "in_progress" ? "Checked in" : "Check in"}
@@ -2129,18 +2149,7 @@ function Appointments({
                   <button
                     type="button"
                     className="classic-button"
-                    onClick={async () => {
-                      const handedOver = await onHandoverToDentist(selectedAppointment.id);
-                      if (handedOver) {
-                        setItems((current) =>
-                          current.map((appointment) =>
-                            appointment.id === selectedAppointment.id
-                              ? { ...appointment, status: "in_progress" }
-                              : appointment,
-                          ),
-                        );
-                      }
-                    }}
+                    onClick={() => void runHandover(selectedAppointment)}
                     disabled={selectedAppointment.status !== "confirmed"}
                   >
                     Handover to dentist
