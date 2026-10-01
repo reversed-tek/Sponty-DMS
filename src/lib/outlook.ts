@@ -171,18 +171,41 @@ export async function sendPaymentProofNotification(invoiceNumber: string, patien
   if (!response.ok) throw new Error(`Outlook could not notify staff (${response.status}).`)
 }
 
-export async function sendPatientPortalAccessEmail(recipient: string, patientName: string, token: string, appUrl: string) {
+export async function sendPatientPortalAccessEmail(
+  recipient: string,
+  patientName: string,
+  token: string,
+  verificationCode: string,
+  appUrl: string,
+) {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { data } = await supabase.auth.getSession()
   const providerToken = data.session?.provider_token
   if (!providerToken) throw new Error('Microsoft email access is not available. Sign in again and grant Mail.Send permission.')
+
   const portalUrl = `${appUrl.replace(/\/$/, '')}/portal/${encodeURIComponent(token)}`
   const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${providerToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: { subject: 'Your Sponty Dental Services patient portal', body: { contentType: 'HTML', content: `<p>Hello ${escapeHtml(patientName)},</p><p>Use the secure link below to view invoices, payment instructions, and share documents with the clinic.</p><p><a href="${escapeHtml(portalUrl)}" style="display:inline-block;padding:10px 16px;background:#0078d4;color:#fff;text-decoration:none;">Open patient portal</a></p><p>This one-time link expires in 24 hours.</p>` }, toRecipients: [{ emailAddress: { address: recipient } }] }, saveToSentItems: true }),
+    headers: {
+      Authorization: `Bearer ${providerToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        subject: 'Your Sponty Dental Services patient portal',
+        body: {
+          contentType: 'HTML',
+          content: `<p>Hello ${escapeHtml(patientName)},</p><p>Use the secure link below to open your patient portal.</p><p><a href="${escapeHtml(portalUrl)}" style="display:inline-block;padding:10px 16px;background:#0078d4;color:#fff;text-decoration:none;">Open patient portal</a></p><p>When prompted, enter this 6-digit verification code:</p><p style="font-size:24px;font-weight:bold;letter-spacing:6px;">${escapeHtml(verificationCode)}</p><p>The link expires in 24 hours and the code is required before a portal session is created.</p>`,
+        },
+        toRecipients: [{ emailAddress: { address: recipient } }],
+      },
+      saveToSentItems: true,
+    }),
   })
-  if (!response.ok) throw new Error(`Outlook could not send the patient portal email (${response.status}).`)
+
+  if (!response.ok) {
+    throw new Error(`Outlook could not send the patient portal email (${response.status}).`)
+  }
 }
 
 export type BookedWaitlistAppointment = {
