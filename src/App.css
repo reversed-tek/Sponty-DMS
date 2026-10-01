@@ -148,3 +148,30 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .portal-bank { min-width: 0; margin: 0; padding: 10px; border: 2px inset #b3bdc8; background: #e8ebee; }.portal-bank legend { padding: 0 5px; font-weight: bold; color: var(--brand-blue-dark); }.portal-bank p { margin: 2px 0 8px; }.portal-bank dl { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; margin: 12px 0 0; }.portal-bank dt { color: #596673; }.portal-bank dd { margin: 0; font-weight: bold; overflow-wrap: anywhere; }.payment-reference { display: block; padding: 7px; color: #fff; background: var(--brand-blue-dark); border: 2px inset #b3bdc8; letter-spacing: 0.5px; }
 .portal-file-explorer { grid-column: 1 / -1; }.explorer-toolbar { display: flex; justify-content: space-between; padding: 6px 8px; color: #fff; background: var(--brand-blue-dark); }.drop-zone { min-height: 96px; display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px; border: 2px dashed #82909f; background: #dfe3e8; color: #3d4d5d; text-align: left; }.drop-zone small { display: block; margin-top: 5px; color: #697582; }.folder-icon { padding: 9px 5px; color: #4c5c6b; border: 2px solid; border-color: #fff #697582 #697582 #fff; background: #c8cdd3; font-size: 10px; font-weight: bold; }.portal-notice { grid-column: 1 / -1; margin: 0; padding: 7px; border: 1px solid #8fa1b4; background: #dcecff; color: #294766; }
 @media (max-width: 700px) { .portal-screen { padding: 0; }.portal-window { min-height: 100vh; border: 0; box-shadow: none; }.portal-toolbar { display: block; }.portal-toolbar span { display: block; margin-top: 5px; }.portal-body { grid-template-columns: 1fr; }.portal-invoice { grid-template-columns: 1fr; gap: 8px; }.portal-invoice > div:nth-child(2) { justify-content: space-between; }.portal-upload-button { justify-self: start; } }
+
+/* Searchable record dropdowns */
+.searchable-select { position: relative; width: 100%; min-width: 260px; font-weight: normal; }
+.filter-row .searchable-select { width: min(360px, 70vw); }
+.searchable-select-control { position: relative; display: flex; width: 100%; background: #fff; border: 2px solid; border-color: #404040 #fff #fff #404040; box-sizing: border-box; }
+.searchable-select-control:focus-within { outline: 1px dotted #000; outline-offset: -4px; }
+.searchable-select-control input { flex: 1; width: 100%; min-width: 0; min-height: 29px; padding: 5px 58px 5px 7px; border: 0; outline: 0; background: #fff; box-sizing: border-box; font: inherit; }
+.searchable-select-clear, .searchable-select-toggle { position: absolute; top: 0; bottom: 0; width: 27px; padding: 0; border: 0; border-left: 1px solid #a8a8a8; background: #f0f0f0; color: #111; font: inherit; cursor: pointer; }
+.searchable-select-clear { right: 27px; font-size: 16px; }
+.searchable-select-toggle { right: 0; font-size: 13px; }
+.searchable-select-clear:hover, .searchable-select-toggle:hover { background: #dcecff; }
+.searchable-select.disabled { opacity: 0.65; }
+.searchable-select-menu { position: absolute; z-index: 40; top: calc(100% + 2px); left: 0; width: max(100%, 320px); max-width: min(520px, 90vw); background: #fff; border: 1px solid #606060; box-shadow: 2px 3px 7px rgba(0,0,0,.28); }
+.searchable-select-menu-summary { padding: 5px 8px; color: #4b5563; background: #eef3f8; border-bottom: 1px solid #c5cbd2; font-size: 11px; }
+.searchable-select-options { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
+.searchable-select-option { width: 100%; display: grid; gap: 2px; padding: 7px 9px; border: 0; border-bottom: 1px solid #e1e4e8; background: #fff; color: #111; text-align: left; cursor: pointer; font: inherit; }
+.searchable-select-option:last-child { border-bottom: 0; }
+.searchable-select-option:hover, .searchable-select-option.active { background: #e8f2ff; }
+.searchable-select-option.selected { background: #dbeaff; }
+.searchable-select-option.selected.active, .searchable-select-option.selected:hover { background: #c9e0ff; }
+.searchable-select-option-label { font-weight: 700; }
+.searchable-select-option-description { color: #586675; font-size: 11px; font-weight: normal; }
+.searchable-select-empty { padding: 18px 10px; color: #586675; text-align: center; }
+@media (max-width: 560px) {
+  .searchable-select, .filter-row .searchable-select { width: 100%; min-width: 0; }
+  .searchable-select-menu { width: 100%; max-width: none; }
+}
