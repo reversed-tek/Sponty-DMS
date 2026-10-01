@@ -22,6 +22,10 @@ export type WorkflowAppointment = {
   reason: string | null
   notes: string | null
   outlook_event_id: string | null
+  checked_in_at: string | null
+  handed_over_at: string | null
+  clinical_updated_at: string | null
+  treatment_completed_at: string | null
 }
 
 export type TreatmentCompletionResult = {
