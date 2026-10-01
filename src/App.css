@@ -175,3 +175,173 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
   .searchable-select, .filter-row .searchable-select { width: 100%; min-width: 0; }
   .searchable-select-menu { width: 100%; max-width: none; }
 }
+
+/* Workflow feedback and portal verification */
+.dentist-queue-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  border: 1px solid #78a4d7;
+  background: #dcecff;
+  color: #234b73;
+}
+.dentist-queue-banner strong {
+  flex: 0 0 auto;
+  color: var(--brand-blue-dark);
+}
+.appointment-row.dentist-ready {
+  border-left: 4px solid var(--brand-blue);
+  background: #eef7ff;
+}
+.appointment-row.dentist-ready .appointment-block {
+  background: #e1efff;
+}
+.dentist-ready-chip {
+  align-self: flex-start;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 2px 6px;
+  border: 1px solid #5d90c9;
+  background: #d7eaff;
+  color: #163f70 !important;
+  font-size: 10px !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.appointment-workflow-meta {
+  display: block;
+  margin-top: 3px;
+  color: #465a70;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.appointment-workflow-card {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #9fb9d8;
+  background: #e7f1ff;
+}
+.appointment-workflow-card strong {
+  color: var(--brand-blue-dark);
+}
+.appointment-workflow-card span {
+  font-weight: 700;
+  color: #234b73;
+}
+.appointment-workflow-card small {
+  color: #52667b;
+}
+.workflow-confirmation-backdrop {
+  z-index: 35;
+}
+.workflow-confirmation-dialog {
+  width: min(500px, 92vw);
+}
+.workflow-confirmation-dialog .dialog-body {
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: start;
+}
+.workflow-confirmation-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid;
+  border-color: #fff #50745b #50745b #fff;
+  background: #ccebd4;
+  color: #14552d;
+  font-size: 24px;
+  font-weight: 700;
+}
+.workflow-confirmation-copy h3 {
+  margin: 0 0 8px;
+  color: var(--brand-blue-dark);
+}
+.workflow-confirmation-copy p {
+  margin: 4px 0;
+  line-height: 1.45;
+}
+.workflow-confirmation-actions {
+  grid-column: 1 / -1;
+}
+
+.portal-verify-window {
+  width: min(540px, 100%);
+  margin: 8vh auto 0;
+}
+.portal-verify-body {
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: start;
+}
+.portal-verify-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 2px solid;
+  border-color: #fff #697582 #697582 #fff;
+  background: #dcecff;
+  color: var(--brand-blue-dark);
+  font-size: 22px;
+  font-weight: 700;
+}
+.portal-verify-body h1 {
+  margin: 0 0 8px;
+  color: var(--brand-blue-dark);
+  font-size: 18px;
+}
+.portal-verify-body p {
+  line-height: 1.5;
+}
+.portal-verify-body small {
+  display: block;
+  margin-top: 10px;
+  color: #52606d;
+  line-height: 1.45;
+}
+.portal-verify-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+.portal-verify-form label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+}
+.portal-verify-form input {
+  width: min(240px, 100%);
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 2px solid;
+  border-color: #404040 #fff #fff #404040;
+  background: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 7px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  .dentist-queue-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .workflow-confirmation-dialog .dialog-body,
+  .portal-verify-body {
+    grid-template-columns: 1fr;
+  }
+  .workflow-confirmation-icon,
+  .portal-verify-icon {
+    margin-bottom: 2px;
+  }
+  .portal-verify-window {
+    margin-top: 0;
+  }
+}
