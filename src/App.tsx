@@ -3024,6 +3024,7 @@ function Billing({ patient }: { patient: Patient | null }) {
   const [recipient, setRecipient] = useState("");
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [invoiceView, setInvoiceView] = useState<"pending" | "paid">("pending");
   const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
 
   const activePatient =
@@ -3033,6 +3034,7 @@ function Billing({ patient }: { patient: Patient | null }) {
     : [];
   const pendingInvoices = filteredByPatient.filter((item) => item.status !== "paid");
   const paidInvoices = filteredByPatient.filter((item) => item.status === "paid");
+  const visibleInvoices = invoiceView === "pending" ? pendingInvoices : paidInvoices;
 
   const renderInvoiceRows = (rows: typeof items) =>
     rows.map((item) => (
@@ -3190,9 +3192,26 @@ function Billing({ patient }: { patient: Patient | null }) {
         </label>
       </div>
       {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
+
+      <div className="billing-tab-strip tab-strip">
+        <button
+          type="button"
+          className={invoiceView === "pending" ? "tab active" : "tab"}
+          onClick={() => setInvoiceView("pending")}
+        >
+          Pending ({pendingInvoices.length})
+        </button>
+        <button
+          type="button"
+          className={invoiceView === "paid" ? "tab active" : "tab"}
+          onClick={() => setInvoiceView("paid")}
+        >
+          Paid ({paidInvoices.length})
+        </button>
+      </div>
+
       <div className="table-wrap">
         <div className="invoice-section">
-          <h3>Pending invoices</h3>
           <table>
             <thead>
               <tr>
@@ -3206,31 +3225,14 @@ function Billing({ patient }: { patient: Patient | null }) {
               </tr>
             </thead>
             <tbody>
-              {renderInvoiceRows(pendingInvoices)}
+              {renderInvoiceRows(visibleInvoices)}
             </tbody>
           </table>
-          {!pendingInvoices.length && <div className="empty-state">No pending invoices.</div>}
-        </div>
-
-        <div className="invoice-section invoice-section-paid">
-          <h3>Paid invoices</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Patient</th>
-                <th>Date</th>
-                <th>Total</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {renderInvoiceRows(paidInvoices)}
-            </tbody>
-          </table>
-          {!paidInvoices.length && <div className="empty-state">No paid invoices.</div>}
+          {!visibleInvoices.length && (
+            <div className="empty-state">
+              {invoiceView === "pending" ? "No pending invoices." : "No paid invoices."}
+            </div>
+          )}
         </div>
       </div>
       {emailInvoice && (
