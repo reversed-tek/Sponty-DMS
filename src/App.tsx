@@ -1479,11 +1479,13 @@ function Patients({
 
 function Appointments({
   setNotice,
+  viewerProfile,
   onCheckIn,
   onHandoverToDentist,
   onCompleteTreatment,
 }: {
   setNotice: (message: string) => void;
+  viewerProfile: Profile;
   onCheckIn: (appointmentId: string) => Promise<boolean> | boolean;
   onHandoverToDentist: (appointmentId: string) => Promise<boolean> | boolean;
   onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
@@ -1500,9 +1502,21 @@ function Appointments({
   const [noteDraft, setNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
   const [appointmentView, setAppointmentView] = useState<"active" | "completed">("active");
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
+  const [workflowConfirmation, setWorkflowConfirmation] = useState<{
+    title: string;
+    patientName: string;
+    time: string;
+    detail: string;
+  } | null>(null);
   const [form, setForm] = useState({ patient_id: "", provider_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
   const completedAppointments = items.filter((item) => item.status === "completed");
+  const dentistQueue = activeAppointments.filter(
+    (item) =>
+      viewerProfile.role === "dentist" &&
+      item.provider_id === viewerProfile.id &&
+      item.status === "in_progress",
+  );
   useEffect(() => {
     if (!supabase) return;
     Promise.all([
@@ -1515,7 +1529,7 @@ function Appointments({
       supabase
         .from("appointments")
         .select(
-          "id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, patients(first_name, last_name)",
+          "id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, patients(first_name, last_name)",
         )
         .order("appointment_date")
         .order("appointment_time"),
@@ -1551,6 +1565,56 @@ function Appointments({
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    const channel = client
+      .channel(`appointments-workflow-${viewerProfile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "appointments",
+        },
+        (payload) => {
+          const changed = payload.new as Partial<Appointment> & {
+            id?: string;
+            provider_id?: string | null;
+          };
+
+          if (!changed.id) return;
+
+          setItems((current) =>
+            current.map((appointment) => {
+              if (appointment.id !== changed.id) return appointment;
+
+              const providerId =
+                changed.provider_id === undefined
+                  ? appointment.provider_id
+                  : changed.provider_id;
+
+              return {
+                ...appointment,
+                ...changed,
+                patient_name: appointment.patient_name,
+                provider_name:
+                  providers.find((provider) => provider.id === providerId)?.full_name ??
+                  appointment.provider_name,
+              };
+            }),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [providers, viewerProfile.id]);
+
   async function addAppointment() {
     if (!supabase || !form.patient_id || !form.provider_id || !form.appointment_date) return;
     const { data: auth } = await supabase.auth.getUser();
@@ -1562,7 +1626,7 @@ function Appointments({
         provider_id: form.provider_id,
         created_by: auth.user?.id,
       })
-      .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, patients(first_name, last_name)")
+      .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, patients(first_name, last_name)")
       .single();
 
     if (insertError) {
@@ -1616,6 +1680,54 @@ function Appointments({
   }
 
   const selectedAppointment = items.find((item) => item.id === selectedAppointmentId) ?? null;
+
+  async function runCheckIn(item: Appointment) {
+    const checkedIn = await onCheckIn(item.id);
+    if (!checkedIn) return;
+
+    const actionTime = new Date().toISOString();
+    setItems((current) =>
+      current.map((appointment) =>
+        appointment.id === item.id
+          ? {
+              ...appointment,
+              status: "confirmed",
+              checked_in_at: appointment.checked_in_at ?? actionTime,
+            }
+          : appointment,
+      ),
+    );
+    setWorkflowConfirmation({
+      title: "Patient checked in",
+      patientName: item.patient_name,
+      time: actionTime,
+      detail: `Assigned to ${item.provider_name}. Next step: hand over the patient when the dentist is ready.`,
+    });
+  }
+
+  async function runHandover(item: Appointment) {
+    const handedOver = await onHandoverToDentist(item.id);
+    if (!handedOver) return;
+
+    const actionTime = new Date().toISOString();
+    setItems((current) =>
+      current.map((appointment) =>
+        appointment.id === item.id
+          ? {
+              ...appointment,
+              status: "in_progress",
+              handed_over_at: appointment.handed_over_at ?? actionTime,
+            }
+          : appointment,
+      ),
+    );
+    setWorkflowConfirmation({
+      title: "Handover complete",
+      patientName: item.patient_name,
+      time: actionTime,
+      detail: `${item.provider_name} can now see this patient in the dentist queue.`,
+    });
+  }
 
   async function saveAppointmentDetails() {
     if (!supabase || !selectedAppointmentId) return;
@@ -1687,8 +1799,20 @@ function Appointments({
       return;
     }
 
+    const activityTime = new Date().toISOString();
+    setItems((current) =>
+      current.map((appointment) =>
+        appointment.id === selectedAppointmentId
+          ? {
+              ...appointment,
+              clinical_updated_at: activityTime,
+              treatment_completed_at: null,
+            }
+          : appointment,
+      ),
+    );
     setTreatmentDraft({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
-    setNotice("Treatment added to the appointment.");
+    setNotice("Treatment added. The appointment activity was updated for staff.");
   }
 
   async function saveDentistClinicalNote() {
@@ -1721,8 +1845,16 @@ function Appointments({
       return;
     }
 
+    const activityTime = new Date().toISOString();
+    setItems((current) =>
+      current.map((appointment) =>
+        appointment.id === selectedAppointmentId
+          ? { ...appointment, clinical_updated_at: activityTime }
+          : appointment,
+      ),
+    );
     setNoteDraft({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
-    setNotice("Clinical note saved for the appointment.");
+    setNotice("Clinical note saved. The appointment activity was updated for staff.");
   }
 
   return (
@@ -1754,8 +1886,27 @@ function Appointments({
             {appointmentView === "active" ? (
               <>
                 <h3>Active appointments</h3>
+                {viewerProfile.role === "dentist" && (
+                  <div className="dentist-queue-banner">
+                    <strong>Dentist queue</strong>
+                    <span>
+                      {dentistQueue.length
+                        ? `${dentistQueue.length} patient${dentistQueue.length === 1 ? "" : "s"} handed over to you and ready for review.`
+                        : "No patients are currently handed over to you."}
+                    </span>
+                  </div>
+                )}
                 {activeAppointments.map((item) => (
-                  <div className="appointment-row" key={item.id}>
+                  <div
+                    className={
+                      viewerProfile.role === "dentist" &&
+                      item.provider_id === viewerProfile.id &&
+                      item.status === "in_progress"
+                        ? "appointment-row dentist-ready"
+                        : "appointment-row"
+                    }
+                    key={item.id}
+                  >
                     <time>
                       {item.appointment_date} {item.appointment_time}
                     </time>
@@ -1764,6 +1915,24 @@ function Appointments({
                       <span>
                         {item.appointment_type} with {item.provider_name}
                       </span>
+                      {viewerProfile.role === "dentist" &&
+                        item.provider_id === viewerProfile.id &&
+                        item.status === "in_progress" && (
+                          <span className="dentist-ready-chip">
+                            {item.clinical_updated_at ? "In your session" : "Ready for you"}
+                          </span>
+                        )}
+                      <small className="appointment-workflow-meta">
+                        {item.treatment_completed_at
+                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)} · awaiting payment`
+                          : item.clinical_updated_at
+                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
+                            : item.handed_over_at
+                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
+                              : item.checked_in_at
+                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
+                                : "Not checked in"}
+                      </small>
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
@@ -1878,6 +2047,24 @@ function Appointments({
                       <span>
                         {item.appointment_type} with {item.provider_name}
                       </span>
+                      {viewerProfile.role === "dentist" &&
+                        item.provider_id === viewerProfile.id &&
+                        item.status === "in_progress" && (
+                          <span className="dentist-ready-chip">
+                            {item.clinical_updated_at ? "In your session" : "Ready for you"}
+                          </span>
+                        )}
+                      <small className="appointment-workflow-meta">
+                        {item.treatment_completed_at
+                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)} · awaiting payment`
+                          : item.clinical_updated_at
+                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
+                            : item.handed_over_at
+                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
+                              : item.checked_in_at
+                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
+                                : "Not checked in"}
+                      </small>
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
