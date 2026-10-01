@@ -1515,7 +1515,8 @@ function Appointments({
     (item) =>
       viewerProfile.role === "dentist" &&
       item.provider_id === viewerProfile.id &&
-      item.status === "in_progress",
+      item.status === "in_progress" &&
+      !item.treatment_completed_at,
   );
   useEffect(() => {
     if (!supabase) return;
@@ -1901,7 +1902,8 @@ function Appointments({
                     className={
                       viewerProfile.role === "dentist" &&
                       item.provider_id === viewerProfile.id &&
-                      item.status === "in_progress"
+                      item.status === "in_progress" &&
+                      !item.treatment_completed_at
                         ? "appointment-row dentist-ready"
                         : "appointment-row"
                     }
@@ -1917,7 +1919,8 @@ function Appointments({
                       </span>
                       {viewerProfile.role === "dentist" &&
                         item.provider_id === viewerProfile.id &&
-                        item.status === "in_progress" && (
+                        item.status === "in_progress" &&
+                        !item.treatment_completed_at && (
                           <span className="dentist-ready-chip">
                             {item.clinical_updated_at ? "In your session" : "Ready for you"}
                           </span>
@@ -2027,7 +2030,8 @@ function Appointments({
                       </span>
                       {viewerProfile.role === "dentist" &&
                         item.provider_id === viewerProfile.id &&
-                        item.status === "in_progress" && (
+                        item.status === "in_progress" &&
+                        !item.treatment_completed_at && (
                           <span className="dentist-ready-chip">
                             {item.clinical_updated_at ? "In your session" : "Ready for you"}
                           </span>
