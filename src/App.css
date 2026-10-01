@@ -345,3 +345,19 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     margin-top: 0;
   }
 }
+
+/* Destructive appointment actions */
+.classic-button.danger {
+  color: #7a0000;
+  background: #f0c8c8;
+  border-color: #fff #7a0000 #7a0000 #fff;
+  font-weight: 700;
+}
+.classic-button.danger:hover,
+.classic-button.danger:focus-visible {
+  color: #fff;
+  background: #a00000;
+}
+.classic-button.danger:active {
+  border-color: #7a0000 #fff #fff #7a0000;
+}
