@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import { signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
+import { issuePatientPortalAccess, signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
 import {
   checkInAppointment,
   completeTreatmentWorkflow,
@@ -62,6 +62,10 @@ type Appointment = {
   reason: string | null;
   notes: string | null;
   outlook_event_id: string | null;
+  checked_in_at: string | null;
+  handed_over_at: string | null;
+  clinical_updated_at: string | null;
+  treatment_completed_at: string | null;
 };
 
 const navItems: Page[] = [
@@ -79,6 +83,13 @@ const toothNumbers = [
 const queryError = (error: { message: string } | null) => error?.message ?? "";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
+const formatWorkflowTime = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("en-PH", {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(value))
+    : "";
 const roleLabel = (role: string) =>
   role === "admin"
     ? "System Administrator"
@@ -345,6 +356,7 @@ function App() {
           {page === "Appointments" && (
             <Appointments
               setNotice={setNotice}
+              viewerProfile={profile}
               onCheckIn={checkInPatientAppointment}
               onHandoverToDentist={handoverToDentist}
               onCompleteTreatment={completeTreatmentForAppointment}
@@ -770,71 +782,60 @@ function Patients({
     setNotice("Patient deleted");
   }
 
-  async function getPatientPortalToken(patient: Patient) {
-    if (!supabase) throw new Error("Supabase is not configured.");
-
-    const { data: token, error: tokenError } = await supabase.rpc(
-      "issue_patient_portal_token",
-      {
-        p_patient_id: patient.id,
-        p_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      },
+  async function createPatientPortalAccess(patient: Patient) {
+    return issuePatientPortalAccess(
+      patient.id,
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     );
-
-    if (tokenError) throw new Error(tokenError.message);
-    if (!token) throw new Error("Portal token could not be generated.");
-
-    return String(token);
-  }
-
-  async function getPatientPortalUrl(patient: Patient) {
-    const token = await getPatientPortalToken(patient);
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    return `${appUrl.replace(/\/$/, "")}/portal/${encodeURIComponent(token)}`;
   }
 
   async function sendPortalLink(patient: Patient) {
-    if (!supabase) return;
     if (!patient.email) {
       setNotice("Add an email address before sending the patient portal link.");
       return;
     }
 
     try {
-      const token = await getPatientPortalToken(patient);
+      const access = await createPatientPortalAccess(patient);
       await sendPatientPortalAccessEmail(
         patient.email,
         `${patient.first_name} ${patient.last_name}`,
-        token,
+        access.token,
+        access.verification_code,
         import.meta.env.VITE_APP_URL || window.location.origin,
       );
 
-      setNotice("Patient portal link sent");
+      setNotice("Patient portal link and verification code sent");
     } catch (reason) {
       const message =
         reason instanceof Error
           ? reason.message
-          : "Patient portal link could not be sent.";
+          : "Patient portal access could not be sent.";
       setError(message);
-      setNotice("Portal link failed");
+      setNotice("Portal access failed");
     }
   }
 
   async function copyPortalLink(patient: Patient) {
     try {
-      const portalUrl = await getPatientPortalUrl(patient);
+      const access = await createPatientPortalAccess(patient);
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      const portalUrl = `${appUrl.replace(/\/$/, "")}/portal/${encodeURIComponent(access.token)}`;
+      const accessText = `Portal link: ${portalUrl}\nVerification code: ${access.verification_code}`;
+
       if (!navigator.clipboard) {
-        window.prompt("Copy the patient portal link:", portalUrl);
-        setNotice("Portal link prepared");
+        window.prompt("Copy the portal link and verification code:", accessText);
+        setNotice("Portal access prepared");
         return;
       }
-      await navigator.clipboard.writeText(portalUrl);
-      setNotice("Portal link copied to clipboard");
+
+      await navigator.clipboard.writeText(accessText);
+      setNotice("Portal link and verification code copied");
     } catch (reason) {
       const message =
         reason instanceof Error
           ? reason.message
-          : "Patient portal link could not be copied.";
+          : "Patient portal access could not be copied.";
       setError(message);
       setNotice("Copy failed");
     }
