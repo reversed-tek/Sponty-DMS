@@ -179,7 +179,11 @@ as $$
 declare
   appointment_value uuid;
 begin
-  appointment_value := coalesce(new.appointment_id, old.appointment_id);
+  if tg_op = 'DELETE' then
+    appointment_value := old.appointment_id;
+  else
+    appointment_value := new.appointment_id;
+  end if;
 
   if appointment_value is not null then
     update public.appointments
@@ -188,7 +192,11 @@ begin
     where id = appointment_value;
   end if;
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+
+  return new;
 end;
 $$;
 
@@ -211,10 +219,17 @@ declare
   has_active_treatment boolean;
   all_active_treatments_complete boolean;
 begin
-  appointment_value := coalesce(new.appointment_id, old.appointment_id);
+  if tg_op = 'DELETE' then
+    appointment_value := old.appointment_id;
+  else
+    appointment_value := new.appointment_id;
+  end if;
 
   if appointment_value is null then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
   end if;
 
   select
@@ -243,7 +258,11 @@ begin
     updated_at = now()
   where id = appointment_value;
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+
+  return new;
 end;
 $$;
 
@@ -350,6 +369,8 @@ grant execute on function public.issue_patient_portal_access(uuid, timestamptz) 
 
 -- The old issuer is disabled for app users so new links cannot be created
 -- without a verification code.
+revoke all on function public.issue_patient_portal_token(uuid, timestamptz)
+  from public;
 revoke execute on function public.issue_patient_portal_token(uuid, timestamptz)
   from anon, authenticated;
 
@@ -403,7 +424,7 @@ begin
   end if;
 
   if token_row.verification_code_hash <>
-     encode(extensions.digest(trim(p_code), 'sha256'), 'hex') then
+     encode(extensions.digest(coalesce(trim(p_code), ''), 'sha256'), 'hex') then
 
     attempts_after := token_row.verification_attempts + 1;
 
@@ -460,6 +481,8 @@ grant execute on function public.verify_patient_portal_access(text, text) to ano
 
 -- Disable the old token-only exchange path so the verification code cannot be
 -- bypassed by calling the legacy RPC directly.
+revoke all on function public.consume_patient_portal_token(text)
+  from public;
 revoke execute on function public.consume_patient_portal_token(text)
   from anon, authenticated;
 
