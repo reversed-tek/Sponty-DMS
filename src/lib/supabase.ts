@@ -116,11 +116,67 @@ export type PortalContext = {
   expires_at: string
 }
 
-export async function consumePatientPortalToken(token: string) {
+export type PortalAccessGrant = {
+  token: string
+  verification_code: string
+  expires_at: string
+}
+
+export async function issuePatientPortalAccess(
+  patientId: string,
+  expiresAt?: string,
+) {
   const client = requireSupabase()
-  const { data, error } = await client.rpc('consume_patient_portal_token', { p_token: token })
-  if (error) throw new Error('This portal link is invalid, expired, or already used.')
-  return data as PortalContext
+  const { data, error } = await client.rpc('issue_patient_portal_access', {
+    p_patient_id: patientId,
+    ...(expiresAt ? { p_expires_at: expiresAt } : {}),
+  })
+  if (error) throw new Error(error.message)
+  if (!data?.token || !data?.verification_code) {
+    throw new Error('Portal access could not be generated.')
+  }
+  return data as PortalAccessGrant
+}
+
+export async function verifyPatientPortalAccess(token: string, code: string) {
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('verify_patient_portal_access', {
+    p_token: token,
+    p_code: code,
+  })
+  if (error) throw new Error(error.message)
+
+  const result = data as
+    | (PortalContext & { verified: true })
+    | {
+        verified: false
+        error: string
+        attempts_remaining: number
+      }
+
+  if (!result.verified) {
+    if (result.error === 'portal_verification_locked') {
+      throw new Error('Too many incorrect attempts. Request a new portal email.')
+    }
+    if (result.error === 'portal_token_invalid_or_expired') {
+      throw new Error('This portal link is invalid or expired. Request a new link.')
+    }
+    if (result.error === 'portal_verification_required') {
+      throw new Error('This portal link must be reissued with a verification code.')
+    }
+
+    const remaining = Number(result.attempts_remaining ?? 0)
+    throw new Error(
+      `Incorrect verification code.${remaining > 0 ? ` ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` : ''}`,
+    )
+  }
+
+  return {
+    session_token: result.session_token,
+    patient_id: result.patient_id,
+    patient_name: result.patient_name,
+    expires_at: result.expires_at,
+  } satisfies PortalContext
 }
 
 export async function getPatientPortalData(sessionToken: string) {
