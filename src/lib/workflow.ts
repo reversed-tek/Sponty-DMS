@@ -128,6 +128,18 @@ export async function handoverAppointmentToDentist(appointmentId: string) {
   return data as WorkflowAppointment
 }
 
+export async function deleteAppointment(appointmentId: string) {
+  const { data, error } = await client().rpc('delete_appointment', {
+    p_appointment_id: appointmentId,
+  })
+  if (error) throw new Error(error.message)
+  return data as {
+    appointment_id: string
+    deleted: boolean
+    outlook_event_id: string | null
+  }
+}
+
 export async function completeTreatmentWorkflow(appointmentId: string) {
   const { data, error } = await client().rpc('complete_treatment_workflow', { p_appointment_id: appointmentId })
   if (error) throw new Error(error.message)

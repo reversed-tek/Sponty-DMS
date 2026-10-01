@@ -4,6 +4,7 @@ import { issuePatientPortalAccess, signInWithMicrosoft, signOut, supabase } from
 import {
   checkInAppointment,
   completeTreatmentWorkflow,
+  deleteAppointment,
   getPatientVisitHistory,
   handoverAppointmentToDentist,
   listActiveProviders,
@@ -1609,6 +1610,28 @@ function Appointments({
           );
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "appointments",
+        },
+        (payload) => {
+          const deleted = payload.old as { id?: string };
+          if (!deleted.id) return;
+
+          setItems((current) =>
+            current.filter((appointment) => appointment.id !== deleted.id),
+          );
+          setSelectedAppointmentId((current) =>
+            current === deleted.id ? null : current,
+          );
+          setExpandedActionId((current) =>
+            current === deleted.id ? null : current,
+          );
+        },
+      )
       .subscribe();
 
     return () => {
@@ -1728,6 +1751,63 @@ function Appointments({
       time: actionTime,
       detail: `${item.provider_name} can now see this patient in the dentist queue.`,
     });
+  }
+
+  const canDeleteAppointment = (item: Appointment) =>
+    (viewerProfile.role === "admin" || viewerProfile.role === "receptionist") &&
+    ["scheduled", "booked", "open"].includes(item.status) &&
+    !item.checked_in_at &&
+    !item.handed_over_at &&
+    !item.clinical_updated_at &&
+    !item.treatment_completed_at;
+
+  async function runDeleteAppointment(item: Appointment) {
+    const outlookWarning = item.outlook_event_id
+      ? "\n\nThis appointment is synced to Outlook. Deleting it from Sponty does not automatically remove the Outlook calendar event."
+      : "";
+
+    const confirmed = window.confirm(
+      `Permanently delete the appointment for ${item.patient_name} on ${item.appointment_date} at ${item.appointment_time}?\n\nThis action cannot be undone.${outlookWarning}`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteAppointment(item.id);
+      setItems((current) =>
+        current.filter((appointment) => appointment.id !== item.id),
+      );
+      setExpandedActionId((current) => (current === item.id ? null : current));
+      setSelectedAppointmentId((current) => (current === item.id ? null : current));
+      setMessage("");
+      setNotice(
+        item.outlook_event_id
+          ? "Appointment deleted from Sponty. Check Outlook if the synced calendar event also needs to be removed."
+          : "Appointment deleted.",
+      );
+    } catch (reason) {
+      const rawMessage =
+        reason instanceof Error ? reason.message : "Appointment could not be deleted.";
+
+      if (
+        rawMessage.includes("appointment_has_linked_records") ||
+        rawMessage.includes("appointment_has_workflow_history")
+      ) {
+        setMessage(
+          "This appointment has clinical, treatment, billing, or workflow history and cannot be permanently deleted.",
+        );
+      } else if (
+        rawMessage.includes("appointment_cannot_be_deleted_after_check_in_or_completion")
+      ) {
+        setMessage(
+          "Only appointments that have not been checked in can be permanently deleted.",
+        );
+      } else if (rawMessage.includes("receptionist_or_admin_required")) {
+        setMessage("Only a receptionist or administrator can delete appointments.");
+      } else {
+        setMessage(rawMessage);
+      }
+    }
   }
 
   async function saveAppointmentDetails() {
@@ -2009,6 +2089,15 @@ function Appointments({
                         >
                           Complete treatment
                         </button>
+                        {canDeleteAppointment(item) && (
+                          <button
+                            type="button"
+                            className="classic-button danger"
+                            onClick={() => void runDeleteAppointment(item)}
+                          >
+                            Delete appointment
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2320,6 +2409,15 @@ function Appointments({
               </div>
 
               <div className="dialog-actions">
+                {canDeleteAppointment(selectedAppointment) && (
+                  <button
+                    type="button"
+                    className="classic-button danger"
+                    onClick={() => void runDeleteAppointment(selectedAppointment)}
+                  >
+                    Delete appointment
+                  </button>
+                )}
                 <button type="button" className="classic-button" onClick={() => setSelectedAppointmentId(null)}>
                   Close
                 </button>
