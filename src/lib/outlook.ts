@@ -8,6 +8,7 @@ type InvoiceEmail = {
   invoiceDate: string
   recipient: string
   notes?: string
+  kind?: 'invoice' | 'receipt'
 }
 
 type CalendarAppointment = {
@@ -63,12 +64,15 @@ export async function sendInvoiceEmail(invoice: InvoiceEmail) {
     throw new Error('Microsoft email access is not available. Sign in again and grant Mail.Send permission.')
   }
 
+  const isReceipt = invoice.kind === 'receipt'
   const message = {
     message: {
-      subject: `Invoice ${invoice.invoiceNumber} from Sponty Dental Services`,
+      subject: `${isReceipt ? 'Receipt' : 'Invoice'} ${invoice.invoiceNumber} from Sponty Dental Services`,
       body: {
         contentType: 'HTML',
-        content: `<p>Hello,</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> is available.</p><p><strong>Patient:</strong> ${invoice.patientName}<br><strong>Invoice date:</strong> ${invoice.invoiceDate}<br><strong>Total:</strong> ${invoice.total}<br><strong>Balance due:</strong> ${invoice.balance}</p>${invoice.notes ? `<p>${invoice.notes}</p>` : ''}<p>Please contact the practice if you have any questions.</p>`,
+        content: isReceipt
+          ? `<p>Hello,</p><p>Thank you. Payment for <strong>${invoice.invoiceNumber}</strong> has been recorded.</p><p><strong>Patient:</strong> ${invoice.patientName}<br><strong>Receipt date:</strong> ${invoice.invoiceDate}<br><strong>Total:</strong> ${invoice.total}<br><strong>Balance:</strong> ${invoice.balance}</p>${invoice.notes ? `<p>${invoice.notes}</p>` : ''}<p>Please keep this email as your payment receipt.</p>`
+          : `<p>Hello,</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> is available.</p><p><strong>Patient:</strong> ${invoice.patientName}<br><strong>Invoice date:</strong> ${invoice.invoiceDate}<br><strong>Total:</strong> ${invoice.total}<br><strong>Balance due:</strong> ${invoice.balance}</p>${invoice.notes ? `<p>${invoice.notes}</p>` : ''}<p>Please contact the practice if you have any questions.</p>`,
       },
       toRecipients: [{ emailAddress: { address: invoice.recipient } }],
     },
