@@ -17,6 +17,7 @@ import {
 } from "./lib/outlook";
 import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
 import { PatientPortal } from "./components/PatientPortal";
+import { SearchableSelect } from "./components/SearchableSelect";
 
 type Page =
   | "Dashboard"
@@ -2129,7 +2130,22 @@ function Appointments({
           </section>
         </div>
       )}
-      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Appointment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><label>Patient<select value={form.patient_id} onChange={(event) => setForm({ ...form, patient_id: event.target.value })}><option value="">Select patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name} ({patient.patient_number})</option>)}</select></label><label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
+      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Appointment <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><label>
+  Patient
+  <SearchableSelect
+    value={form.patient_id}
+    onChange={(patientId) => setForm({ ...form, patient_id: patientId })}
+    placeholder="Select patient"
+    searchPlaceholder="Search patient name or number..."
+    emptyMessage="No patients match your search."
+    options={patients.map((patient) => ({
+      value: patient.id,
+      label: `${patient.first_name} ${patient.last_name}`,
+      description: patient.patient_number,
+      searchText: `${patient.patient_number} ${patient.first_name} ${patient.last_name} ${patient.phone ?? ""} ${patient.email ?? ""}`,
+    }))}
+  />
+</label><label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
     </section>
   );
 }
@@ -2623,33 +2639,19 @@ function Treatments({
       <div className="filter-row">
         <label>
           Patient
-          <input
-            list="treatment-patient-options"
-            value={
-              activePatient
-                ? `${activePatient.first_name} ${activePatient.last_name} (${activePatient.patient_number})`
-                : ""
-            }
-            placeholder="Type patient name or number"
-            onChange={(event) => {
-              const rawValue = event.target.value.trim();
-              const match = patientOptions.find(
-                (option) =>
-                  `${option.first_name} ${option.last_name} (${option.patient_number})` === rawValue ||
-                  `${option.first_name} ${option.last_name}` === rawValue ||
-                  option.patient_number === rawValue,
-              );
-              setSelectedPatientId(match ? match.id : "");
-            }}
+          <SearchableSelect
+            value={selectedPatientId}
+            onChange={setSelectedPatientId}
+            placeholder="Select patient"
+            searchPlaceholder="Search patient name or number..."
+            emptyMessage="No patients match your search."
+            options={patientOptions.map((option) => ({
+              value: option.id,
+              label: `${option.first_name} ${option.last_name}`,
+              description: option.patient_number,
+              searchText: `${option.patient_number} ${option.first_name} ${option.last_name} ${option.phone ?? ""} ${option.email ?? ""}`,
+            }))}
           />
-          <datalist id="treatment-patient-options">
-            {patientOptions.map((option) => (
-              <option
-                key={option.id}
-                value={`${option.first_name} ${option.last_name} (${option.patient_number})`}
-              />
-            ))}
-          </datalist>
         </label>
       </div>
       {error && <p className="send-error">{error}</p>}
@@ -2971,33 +2973,19 @@ function Billing({ patient }: { patient: Patient | null }) {
       <div className="filter-row">
         <label>
           Patient
-          <input
-            list="billing-patient-options"
-            value={
-              activePatient
-                ? `${activePatient.first_name} ${activePatient.last_name} (${activePatient.patient_number})`
-                : ""
-            }
-            placeholder="Type patient name or number"
-            onChange={(event) => {
-              const rawValue = event.target.value.trim();
-              const match = patientOptions.find(
-                (option) =>
-                  `${option.first_name} ${option.last_name} (${option.patient_number})` === rawValue ||
-                  `${option.first_name} ${option.last_name}` === rawValue ||
-                  option.patient_number === rawValue,
-              );
-              setSelectedPatientId(match ? match.id : "");
-            }}
+          <SearchableSelect
+            value={selectedPatientId}
+            onChange={setSelectedPatientId}
+            placeholder="Select patient"
+            searchPlaceholder="Search patient name or number..."
+            emptyMessage="No patients match your search."
+            options={patientOptions.map((option) => ({
+              value: option.id,
+              label: `${option.first_name} ${option.last_name}`,
+              description: option.patient_number,
+              searchText: `${option.patient_number} ${option.first_name} ${option.last_name} ${option.phone ?? ""} ${option.email ?? ""}`,
+            }))}
           />
-          <datalist id="billing-patient-options">
-            {patientOptions.map((option) => (
-              <option
-                key={option.id}
-                value={`${option.first_name} ${option.last_name} (${option.patient_number})`}
-              />
-            ))}
-          </datalist>
         </label>
       </div>
       {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
