@@ -51,6 +51,14 @@ type Profile = {
   is_active: boolean;
   last_login_at: string | null;
 };
+type ExistingCaseOption = {
+  id: string;
+  case_number: string;
+  title: string;
+  status: string;
+  updated_at: string;
+};
+
 type Appointment = {
   id: string;
   patient_id: string;
@@ -128,6 +136,7 @@ function App() {
   const [, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [requestedCaseId, setRequestedCaseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -221,7 +230,12 @@ function App() {
 
   async function checkInPatientAppointment(
     appointmentId: string,
-    intake: { caseTitle: string; intakeNotes: string },
+    intake: {
+      caseTitle: string;
+      intakeNotes: string;
+      existingCaseId: string | null;
+      createNewCase: boolean;
+    },
   ): Promise<boolean> {
     try {
       const appointment = await checkInAppointment(appointmentId, intake);
@@ -347,10 +361,19 @@ function App() {
               viewerProfile={profile}
               onCheckIn={checkInPatientAppointment}
               onHandoverToDentist={handoverToDentist}
-              onOpenCases={() => navigate("Cases")}
+              onOpenCase={(caseId) => {
+                setRequestedCaseId(caseId);
+                navigate("Cases");
+              }}
             />
           )}
-          {page === "Cases" && <Cases setNotice={setNotice} />}
+          {page === "Cases" && (
+            <Cases
+              setNotice={setNotice}
+              initialCaseId={requestedCaseId}
+              onInitialCaseHandled={() => setRequestedCaseId(null)}
+            />
+          )}
           {page === "Treatments" && (
             <Treatments patient={selectedPatient} setNotice={setNotice} />
           )}
@@ -1479,16 +1502,21 @@ function Appointments({
   viewerProfile,
   onCheckIn,
   onHandoverToDentist,
-  onOpenCases,
+  onOpenCase,
 }: {
   setNotice: (message: string) => void;
   viewerProfile: Profile;
   onCheckIn: (
     appointmentId: string,
-    intake: { caseTitle: string; intakeNotes: string },
+    intake: {
+      caseTitle: string;
+      intakeNotes: string;
+      existingCaseId: string | null;
+      createNewCase: boolean;
+    },
   ) => Promise<boolean> | boolean;
   onHandoverToDentist: (appointmentId: string) => Promise<boolean> | boolean;
-  onOpenCases: () => void;
+  onOpenCase: (caseId: string | null) => void;
 }) {
   const [items, setItems] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -1499,7 +1527,19 @@ function Appointments({
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "", providerId: "" });
   const [checkInTarget, setCheckInTarget] = useState<Appointment | null>(null);
-  const [checkInDraft, setCheckInDraft] = useState({ caseTitle: "", intakeNotes: "" });
+  const [activePatientCases, setActivePatientCases] = useState<ExistingCaseOption[]>([]);
+  const [checkInCasesLoading, setCheckInCasesLoading] = useState(false);
+  const [checkInDraft, setCheckInDraft] = useState<{
+    mode: "new" | "existing";
+    existingCaseId: string;
+    caseTitle: string;
+    intakeNotes: string;
+  }>({
+    mode: "new",
+    existingCaseId: "",
+    caseTitle: "",
+    intakeNotes: "",
+  });
   const [appointmentView, setAppointmentView] = useState<"active" | "completed">("active");
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [workflowConfirmation, setWorkflowConfirmation] = useState<{
@@ -1697,19 +1737,64 @@ function Appointments({
 
   const selectedAppointment = items.find((item) => item.id === selectedAppointmentId) ?? null;
 
-  function runCheckIn(item: Appointment) {
+  async function runCheckIn(item: Appointment) {
     setCheckInTarget(item);
+    setCheckInCasesLoading(true);
     setCheckInDraft({
+      mode: "new",
+      existingCaseId: "",
       caseTitle: item.reason ?? `${item.appointment_type} case`,
       intakeNotes: item.notes ?? "",
     });
+
+    if (!supabase) {
+      setActivePatientCases([]);
+      setCheckInCasesLoading(false);
+      return;
+    }
+
+    const { data, error: caseError } = await supabase
+      .from("cases")
+      .select("id, case_number, title, status, updated_at")
+      .eq("patient_id", item.patient_id)
+      .in("status", ["open", "in_treatment", "awaiting_payment"])
+      .order("updated_at", { ascending: false });
+
+    if (caseError) {
+      setMessage(caseError.message);
+      setActivePatientCases([]);
+    } else {
+      const options = (data ?? []) as ExistingCaseOption[];
+      setActivePatientCases(options);
+      if (options.length) {
+        setCheckInDraft((current) => ({
+          ...current,
+          mode: "existing",
+          existingCaseId: options[0].id,
+        }));
+      }
+    }
+
+    setCheckInCasesLoading(false);
   }
 
   async function confirmCheckIn() {
     if (!checkInTarget) return;
 
     const item = checkInTarget;
-    const checkedIn = await onCheckIn(item.id, checkInDraft);
+
+    if (checkInDraft.mode === "existing" && !checkInDraft.existingCaseId) {
+      setMessage("Select an existing case or choose Create new case.");
+      return;
+    }
+
+    const checkedIn = await onCheckIn(item.id, {
+      caseTitle: checkInDraft.caseTitle,
+      intakeNotes: checkInDraft.intakeNotes,
+      existingCaseId:
+        checkInDraft.mode === "existing" ? checkInDraft.existingCaseId : null,
+      createNewCase: checkInDraft.mode === "new",
+    });
     if (!checkedIn) return;
 
     const actionTime = new Date().toISOString();
@@ -1731,7 +1816,10 @@ function Appointments({
       title: "Patient checked in · Case ready",
       patientName: item.patient_name,
       time: actionTime,
-      detail: `A case has been created or linked for this patient. Next step: hand it over to ${item.provider_name}.`,
+      detail:
+        checkInDraft.mode === "existing"
+          ? `The appointment was linked to the selected existing case. Next step: hand it over to ${item.provider_name}.`
+          : `A new case was created for this visit. Next step: hand it over to ${item.provider_name}.`,
     });
   }
 
@@ -1975,10 +2063,10 @@ function Appointments({
                         <button
                           type="button"
                           className="classic-button primary"
-                          onClick={onOpenCases}
+                          onClick={() => onOpenCase(item.case_id)}
                           disabled={!item.case_id}
                         >
-                          Open Cases
+                          Open Case
                         </button>
                         {canDeleteAppointment(item) && (
                           <button
@@ -2048,46 +2136,133 @@ function Appointments({
 
       {checkInTarget && (
         <div className="modal-backdrop">
-          <section className="classic-dialog" role="dialog" aria-modal="true">
+          <section className="classic-dialog check-in-case-dialog" role="dialog" aria-modal="true">
             <div className="dialog-title">
-              Check In &amp; Create Case
+              Check In &amp; Select Case
               <button type="button" onClick={() => setCheckInTarget(null)}>X</button>
             </div>
             <div className="dialog-body">
               <p className="dialog-intro">
-                Enter the basic intake details for {checkInTarget.patient_name}. This creates a new case, or links this visit to the patient's current open case.
+                Check in {checkInTarget.patient_name}, then either continue an existing active case or create a separate new case for this visit.
               </p>
-              <label>
-                Case title / reason
-                <input
-                  value={checkInDraft.caseTitle}
-                  onChange={(event) =>
-                    setCheckInDraft((current) => ({ ...current, caseTitle: event.target.value }))
-                  }
-                  placeholder="e.g. Upper right tooth pain"
-                />
-              </label>
+
+              {checkInCasesLoading ? (
+                <div className="empty-state">Checking active cases...</div>
+              ) : (
+                <div className="case-choice-list">
+                  {activePatientCases.length > 0 && (
+                    <label className="case-choice-option">
+                      <input
+                        type="radio"
+                        name="check-in-case-mode"
+                        checked={checkInDraft.mode === "existing"}
+                        onChange={() =>
+                          setCheckInDraft((current) => ({
+                            ...current,
+                            mode: "existing",
+                            existingCaseId:
+                              current.existingCaseId || activePatientCases[0]?.id || "",
+                          }))
+                        }
+                      />
+                      <span>
+                        <strong>Continue an existing case</strong>
+                        <small>Use this when the appointment is another visit for ongoing treatment.</small>
+                      </span>
+                    </label>
+                  )}
+
+                  {checkInDraft.mode === "existing" && activePatientCases.length > 0 && (
+                    <label>
+                      Existing case
+                      <select
+                        value={checkInDraft.existingCaseId}
+                        onChange={(event) =>
+                          setCheckInDraft((current) => ({
+                            ...current,
+                            existingCaseId: event.target.value,
+                          }))
+                        }
+                      >
+                        {activePatientCases.map((caseOption) => (
+                          <option key={caseOption.id} value={caseOption.id}>
+                            {caseOption.case_number} · {caseOption.title} · {caseOption.status.replace("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
+                  <label className="case-choice-option">
+                    <input
+                      type="radio"
+                      name="check-in-case-mode"
+                      checked={checkInDraft.mode === "new"}
+                      onChange={() =>
+                        setCheckInDraft((current) => ({
+                          ...current,
+                          mode: "new",
+                          existingCaseId: "",
+                        }))
+                      }
+                    />
+                    <span>
+                      <strong>Create a new case</strong>
+                      <small>Use this when the patient is being seen for a separate dental issue or course of treatment.</small>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {checkInDraft.mode === "new" && (
+                <label>
+                  New case title / reason
+                  <input
+                    value={checkInDraft.caseTitle}
+                    onChange={(event) =>
+                      setCheckInDraft((current) => ({
+                        ...current,
+                        caseTitle: event.target.value,
+                      }))
+                    }
+                    placeholder="e.g. Upper right tooth pain"
+                  />
+                </label>
+              )}
+
               <label>
                 Reception intake notes
                 <textarea
                   value={checkInDraft.intakeNotes}
                   onChange={(event) =>
-                    setCheckInDraft((current) => ({ ...current, intakeNotes: event.target.value }))
+                    setCheckInDraft((current) => ({
+                      ...current,
+                      intakeNotes: event.target.value,
+                    }))
                   }
                   placeholder="Basic symptoms, arrival notes, or information for the dentist"
                 />
               </label>
+
               <div className="dialog-actions">
-                <button type="button" className="classic-button" onClick={() => setCheckInTarget(null)}>
+                <button
+                  type="button"
+                  className="classic-button"
+                  onClick={() => setCheckInTarget(null)}
+                >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="classic-button primary"
-                  disabled={!checkInDraft.caseTitle.trim()}
+                  disabled={
+                    checkInCasesLoading ||
+                    (checkInDraft.mode === "new" && !checkInDraft.caseTitle.trim()) ||
+                    (checkInDraft.mode === "existing" && !checkInDraft.existingCaseId)
+                  }
                   onClick={() => void confirmCheckIn()}
                 >
-                  Check In &amp; Create Case
+                  Check In
                 </button>
               </div>
             </div>
@@ -2186,10 +2361,10 @@ function Appointments({
                   <button
                     type="button"
                     className="classic-button primary"
-                    onClick={onOpenCases}
+                    onClick={() => onOpenCase(selectedAppointment.case_id)}
                     disabled={!selectedAppointment.case_id}
                   >
-                    Open Cases
+                    Open Case
                   </button>
                 </div>
               </div>
