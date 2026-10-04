@@ -96,20 +96,21 @@ export function CaseTreatmentPlan({
     };
   }, [caseId]);
 
-  const activeItems = items.filter((item) => item.status !== "cancelled");
-  const completedItems = activeItems.filter((item) => item.status === "completed");
-  const estimatedTotal = activeItems.reduce(
+  const planItems = items.filter((item) => item.status !== "cancelled");
+  const actionableItems = planItems.filter((item) => item.status !== "deferred");
+  const completedItems = actionableItems.filter((item) => item.status === "completed");
+  const estimatedTotal = planItems.reduce(
     (sum, item) => sum + Number(item.estimated_cost),
     0,
   );
-  const acceptedTotal = activeItems
+  const acceptedTotal = planItems
     .filter((item) =>
       ["accepted", "in_progress", "completed"].includes(item.status),
     )
     .reduce((sum, item) => sum + Number(item.estimated_cost), 0);
 
-  const progress = activeItems.length
-    ? Math.round((completedItems.length / activeItems.length) * 100)
+  const progress = actionableItems.length
+    ? Math.round((completedItems.length / actionableItems.length) * 100)
     : 0;
 
   const nextSequence = useMemo(
@@ -226,7 +227,7 @@ export function CaseTreatmentPlan({
         </div>
         <div>
           <span>Items complete</span>
-          <strong>{completedItems.length}/{activeItems.length}</strong>
+          <strong>{completedItems.length}/{actionableItems.length}</strong>
         </div>
       </div>
 
