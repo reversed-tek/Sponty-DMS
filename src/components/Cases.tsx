@@ -14,8 +14,17 @@ import type {
 } from "../lib/caseService";
 import { supabase } from "../lib/supabase";
 import { listActiveProviders } from "../lib/workflow";
+import { CaseTreatmentPlan } from "./CaseTreatmentPlan";
+import { CaseTasks } from "./CaseTasks";
 
-type CaseTab = "overview" | "clinical" | "treatments" | "billing" | "activity";
+type CaseTab =
+  | "overview"
+  | "plan"
+  | "clinical"
+  | "treatments"
+  | "tasks"
+  | "billing"
+  | "activity";
 
 type CaseRecord = {
   id: string;
@@ -194,6 +203,7 @@ export function Cases({
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [recallMonths, setRecallMonths] = useState("6");
   const [error, setError] = useState("");
   const [showClinicalForm, setShowClinicalForm] = useState(false);
   const [showTreatmentForm, setShowTreatmentForm] = useState(false);
@@ -611,9 +621,11 @@ export function Cases({
 
     setSaving(true);
     try {
-      await closeCase(selectedCase.id);
+      await closeCase(selectedCase.id, Number(recallMonths));
       setNotice(
-        `${selectedCase.case_number} clinically closed. Billing remains tracked separately.`,
+        Number(recallMonths) > 0
+          ? `${selectedCase.case_number} clinically closed. A preventive recall was scheduled in ${recallMonths} months.`
+          : `${selectedCase.case_number} clinically closed with no automatic recall.`,
       );
       await refreshSelectedCase();
     } catch (reason) {
@@ -829,6 +841,21 @@ export function Cases({
               </label>
 
               <div className="case-command-actions">
+                {selectedCase.status !== "closed" && (
+                  <label className="case-recall-selector">
+                    Recall after close
+                    <select
+                      value={recallMonths}
+                      onChange={(event) => setRecallMonths(event.target.value)}
+                    >
+                      <option value="0">No recall</option>
+                      <option value="1">1 month</option>
+                      <option value="3">3 months</option>
+                      <option value="6">6 months</option>
+                      <option value="12">12 months</option>
+                    </select>
+                  </label>
+                )}
                 {selectedCase.status === "closed" ? (
                   <button
                     type="button"
@@ -886,8 +913,10 @@ export function Cases({
               {(
                 [
                   ["overview", "Overview"],
+                  ["plan", "Treatment Plan"],
                   ["clinical", "Clinical Notes"],
                   ["treatments", "Treatments"],
+                  ["tasks", "Tasks"],
                   ["billing", "Billing"],
                   ["activity", "Activity"],
                 ] as Array<[CaseTab, string]>
@@ -979,6 +1008,17 @@ export function Cases({
                       </div>
                     </div>
                   </div>
+                )}
+
+                {tab === "plan" && (
+                  <CaseTreatmentPlan
+                    caseId={selectedCase.id}
+                    selectedVisitId={selectedVisit?.id ?? null}
+                    selectedVisitStatus={selectedVisit?.status ?? null}
+                    onNotice={setNotice}
+                    onChanged={() => void refreshSelectedCase()}
+                    readOnly={selectedCase.status === "closed"}
+                  />
                 )}
 
                 {tab === "clinical" && (
@@ -1281,6 +1321,14 @@ export function Cases({
                       )}
                     </div>
                   </div>
+                )}
+
+                {tab === "tasks" && (
+                  <CaseTasks
+                    caseId={selectedCase.id}
+                    onNotice={setNotice}
+                    readOnly={selectedCase.status === "closed"}
+                  />
                 )}
 
                 {tab === "billing" && (

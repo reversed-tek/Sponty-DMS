@@ -21,6 +21,7 @@ import { SearchableSelect } from "./components/SearchableSelect";
 import { Cases } from "./components/Cases";
 import { Dashboard } from "./components/Dashboard";
 import { AppointmentProgress } from "./components/AppointmentProgress";
+import { PatientRecalls } from "./components/PatientRecalls";
 
 type Page =
   | "Dashboard"
@@ -31,7 +32,7 @@ type Page =
   | "Reports"
   | "User Settings"
   | "Practice Settings";
-type CaseTab = "cases" | "chart" | "history" | null;
+type CaseTab = "cases" | "history" | "recalls" | "chart" | null;
 type Patient = {
   id: string;
   patient_number: string;
@@ -1123,6 +1124,7 @@ function Appointments({
   const [items, setItems] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [providers, setProviders] = useState<ProviderDirectoryEntry[]>([]);
+  const [bookableCases, setBookableCases] = useState<ExistingCaseOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -1150,7 +1152,38 @@ function Appointments({
     time: string;
     detail: string;
   } | null>(null);
-  const [form, setForm] = useState({ patient_id: "", provider_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
+  const [form, setForm] = useState({
+    patient_id: "",
+    provider_id: "",
+    case_id: "",
+    appointment_date: "",
+    appointment_time: "08:00",
+    duration_minutes: "30",
+    appointment_type: "checkup",
+    reason: "",
+  });
+  useEffect(() => {
+    if (!supabase || !form.patient_id) {
+      setBookableCases([]);
+      return;
+    }
+
+    void supabase
+      .from("cases")
+      .select("id, case_number, title, status, updated_at")
+      .eq("patient_id", form.patient_id)
+      .in("status", ["open", "in_treatment", "treatment_complete"])
+      .order("updated_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setMessage(error.message);
+          setBookableCases([]);
+          return;
+        }
+        setBookableCases((data ?? []) as ExistingCaseOption[]);
+      });
+  }, [form.patient_id]);
+
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
   const completedAppointments = items.filter((item) => item.status === "completed");
   useEffect(() => {
@@ -1280,6 +1313,7 @@ function Appointments({
       .from("appointments")
       .insert({
         ...form,
+        case_id: form.case_id || null,
         duration_minutes: Number(form.duration_minutes),
         provider_id: form.provider_id,
         created_by: auth.user?.id,
@@ -1303,7 +1337,21 @@ function Appointments({
         notes: data.notes ?? null,
       } as Appointment, ...current]);
       setShowForm(false);
-      setNotice("Appointment saved to Supabase");
+      setForm({
+        patient_id: "",
+        provider_id: "",
+        case_id: "",
+        appointment_date: "",
+        appointment_time: "08:00",
+        duration_minutes: "30",
+        appointment_type: "checkup",
+        reason: "",
+      });
+      setNotice(
+        data.case_id
+          ? "Follow-up appointment booked and linked to the Case."
+          : "Appointment saved to Supabase",
+      );
     }
   }
   async function sync(item: Appointment) {
@@ -1343,8 +1391,8 @@ function Appointments({
     setCheckInTarget(item);
     setCheckInCasesLoading(true);
     setCheckInDraft({
-      mode: "new",
-      existingCaseId: "",
+      mode: item.case_id ? "existing" : "new",
+      existingCaseId: item.case_id ?? "",
       caseTitle: item.reason ?? `${item.appointment_type} case`,
       intakeNotes: item.notes ?? "",
     });
@@ -1368,7 +1416,7 @@ function Appointments({
     } else {
       const options = (data ?? []) as ExistingCaseOption[];
       setActivePatientCases(options);
-      if (options.length) {
+      if (!item.case_id && options.length) {
         setCheckInDraft((current) => ({
           ...current,
           mode: "existing",
@@ -1769,6 +1817,7 @@ function Appointments({
                       Existing case
                       <select
                         value={checkInDraft.existingCaseId}
+                        disabled={Boolean(checkInTarget.case_id)}
                         onChange={(event) =>
                           setCheckInDraft((current) => ({
                             ...current,
@@ -1782,6 +1831,9 @@ function Appointments({
                           </option>
                         ))}
                       </select>
+                      {checkInTarget.case_id && (
+                        <small>This follow-up was linked to this Case when the appointment was booked.</small>
+                      )}
                     </label>
                   )}
 
@@ -2017,7 +2069,9 @@ function Appointments({
   Patient
   <SearchableSelect
     value={form.patient_id}
-    onChange={(patientId) => setForm({ ...form, patient_id: patientId })}
+    onChange={(patientId) =>
+      setForm({ ...form, patient_id: patientId, case_id: "" })
+    }
     placeholder="Select patient"
     searchPlaceholder="Search patient name or number..."
     emptyMessage="No patients match your search."
@@ -2028,7 +2082,23 @@ function Appointments({
       searchText: `${patient.patient_number} ${patient.first_name} ${patient.last_name} ${patient.phone ?? ""} ${patient.email ?? ""}`,
     }))}
   />
-</label><label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
+</label>{bookableCases.length > 0 && (
+  <label>
+    Linked Case (optional)
+    <select
+      value={form.case_id}
+      onChange={(event) => setForm({ ...form, case_id: event.target.value })}
+    >
+      <option value="">New / decide at check-in</option>
+      {bookableCases.map((caseOption) => (
+        <option key={caseOption.id} value={caseOption.id}>
+          {caseOption.case_number} · {caseOption.title} · {caseOption.status.replaceAll("_", " ")}
+        </option>
+      ))}
+    </select>
+    <small>Link follow-up visits now so Case scheduling tasks close immediately.</small>
+  </label>
+)}<label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
     </section>
   );
 }
@@ -2131,6 +2201,7 @@ function PatientCaseWorkspace({
         {[
           { id: "cases", label: "Cases" },
           { id: "history", label: "Visit History" },
+          { id: "recalls", label: "Recalls" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
@@ -2345,6 +2416,10 @@ function PatientCaseWorkspace({
               </div>
             );
           })()}
+        </div>
+      ) : caseTab === "recalls" && patient ? (
+        <div className="patient-case-body">
+          <PatientRecalls patientId={patient.id} onNotice={setNotice} />
         </div>
       ) : caseTab === "chart" ? (
         <div className="patient-case-body">
