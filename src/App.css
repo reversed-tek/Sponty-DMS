@@ -361,3 +361,255 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .classic-button.danger:active {
   border-color: #7a0000 #fff #fff #7a0000;
 }
+
+
+/* Case-centric workflow */
+.cases-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.cases-queue {
+  min-width: 0;
+}
+
+.case-list {
+  max-height: calc(100vh - 235px);
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.case-list-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #808080;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
+  margin-bottom: 5px;
+}
+
+.case-list-item:hover,
+.case-list-item.selected {
+  color: #fff;
+  background: #000080;
+}
+
+.case-list-item small,
+.case-list-item > span {
+  color: #404040;
+}
+
+.case-list-item:hover small,
+.case-list-item:hover > span,
+.case-list-item.selected small,
+.case-list-item.selected > span {
+  color: #fff;
+}
+
+.case-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.case-list-heading .status-badge {
+  flex: 0 0 auto;
+  color: #111;
+}
+
+.case-workspace {
+  min-width: 0;
+}
+
+.case-workspace .panel-title .status-badge {
+  margin-left: auto;
+  color: #111;
+}
+
+.case-header {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 9px;
+}
+
+.case-header > div {
+  min-height: 67px;
+  padding: 7px;
+  background: #d4d0c8;
+  border: 1px solid #fff;
+  border-right-color: #808080;
+  border-bottom-color: #808080;
+}
+
+.case-header span,
+.case-header small {
+  display: block;
+  color: #404040;
+}
+
+.case-header strong {
+  display: block;
+  margin: 4px 0;
+  color: #000080;
+}
+
+.case-tabs .tab {
+  min-width: 105px;
+}
+
+.case-tab-content {
+  min-height: 300px;
+}
+
+.case-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+}
+
+.case-card {
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #808080;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
+}
+
+.case-card:first-child {
+  grid-column: 1 / -1;
+}
+
+.case-card h3 {
+  margin: 0 0 8px;
+  color: #000080;
+  font-size: 14px;
+}
+
+.case-card p {
+  margin: 5px 0;
+}
+
+.case-record-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #d4d0c8;
+}
+
+.case-record-row:last-child {
+  border-bottom: 0;
+}
+
+.case-record-row strong,
+.case-record-row span {
+  display: block;
+}
+
+.case-record-row div > span {
+  margin-top: 2px;
+  color: #404040;
+}
+
+.case-toolbar {
+  min-height: 44px;
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #808080;
+}
+
+.case-toolbar > div {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.case-billing-note {
+  margin: 10px;
+  padding: 8px;
+  background: #fff8c8;
+  border: 1px solid #a08020;
+}
+
+.case-activity-list {
+  padding: 8px;
+}
+
+.case-activity-item {
+  display: grid;
+  grid-template-columns: 165px 1fr;
+  gap: 10px;
+  padding: 8px;
+  background: #fff;
+  border-bottom: 1px solid #aaa;
+}
+
+.case-activity-item time {
+  color: #404040;
+  font-size: 11px;
+}
+
+.case-activity-item strong,
+.case-activity-item span {
+  display: block;
+}
+
+.case-activity-item span {
+  margin-top: 3px;
+  color: #404040;
+}
+
+.status-badge.case-open {
+  background: #e8e8ff;
+}
+
+.status-badge.case-in_treatment {
+  color: #7a3f00;
+  background: #ffe0ad;
+}
+
+.status-badge.case-awaiting_payment {
+  color: #704000;
+  background: #fff0ba;
+}
+
+.status-badge.case-closed {
+  color: #064b06;
+  background: #c8f0c8;
+}
+
+@media (max-width: 900px) {
+  .cases-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .case-list {
+    max-height: 280px;
+  }
+
+  .case-header,
+  .case-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .case-card:first-child {
+    grid-column: auto;
+  }
+
+  .case-activity-item {
+    grid-template-columns: 1fr;
+  }
+}

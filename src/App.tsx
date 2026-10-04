@@ -19,15 +19,17 @@ import {
 import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
 import { PatientPortal } from "./components/PatientPortal";
 import { SearchableSelect } from "./components/SearchableSelect";
+import { Cases } from "./components/Cases";
 
 type Page =
   | "Dashboard"
   | "Patients"
   | "Appointments"
+  | "Cases"
   | "Treatments"
   | "Billing"
   | "Reports"
-  | "User Management"
+  | "User Settings"
   | "Practice Settings";
 type CaseTab = "chart" | "history" | null;
 type Patient = {
@@ -67,15 +69,16 @@ type Appointment = {
   handed_over_at: string | null;
   clinical_updated_at: string | null;
   treatment_completed_at: string | null;
+  case_id: string | null;
 };
 
 const navItems: Page[] = [
   "Dashboard",
   "Patients",
   "Appointments",
-  "Treatments",
+  "Cases",
   "Billing",
-  "Reports",
+  "User Settings",
 ];
 const toothNumbers = [
   18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28, 48, 47, 46,
@@ -216,9 +219,12 @@ function App() {
     setNotice(`${next} selected`);
   };
 
-  async function checkInPatientAppointment(appointmentId: string): Promise<boolean> {
+  async function checkInPatientAppointment(
+    appointmentId: string,
+    intake: { caseTitle: string; intakeNotes: string },
+  ): Promise<boolean> {
     try {
-      const appointment = await checkInAppointment(appointmentId);
+      const appointment = await checkInAppointment(appointmentId, intake);
       setNotice(
         appointment.status === "in_progress"
           ? "Patient is already with the dentist."
@@ -281,7 +287,7 @@ function App() {
         <button type="button" onClick={() => navigate("Patients")}>File</button>
         <button type="button" onClick={() => setNotice("Select a record to edit")}>Edit</button>
         <button type="button" onClick={() => navigate("Appointments")}>View</button>
-        <button type="button" onClick={() => navigate("Practice Settings")}>Tools</button>
+        <button type="button" onClick={() => navigate("User Settings")}>Tools</button>
         <button type="button" onClick={() => setNotice("Use the sidebar to open a module")}>Help</button>
       </div>
       <div className="toolbar">
@@ -309,25 +315,6 @@ function App() {
               </button>
             ))}
           </nav>
-          <div className="sidebar-section">Administration</div>
-          <button
-            type="button"
-            className={
-              page === "User Management" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => navigate("User Management")}
-          >
-            Users
-          </button>
-          <button
-            type="button"
-            className={
-              page === "Practice Settings" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => navigate("Practice Settings")}
-          >
-            Settings
-          </button>
           <div className="sidebar-note">
             <strong>Signed in as</strong>
             <br />
@@ -360,15 +347,16 @@ function App() {
               viewerProfile={profile}
               onCheckIn={checkInPatientAppointment}
               onHandoverToDentist={handoverToDentist}
-              onCompleteTreatment={completeTreatmentForAppointment}
+              onOpenCases={() => navigate("Cases")}
             />
           )}
+          {page === "Cases" && <Cases setNotice={setNotice} />}
           {page === "Treatments" && (
             <Treatments patient={selectedPatient} setNotice={setNotice} />
           )}
           {page === "Billing" && <Billing patient={selectedPatient} />}
           {page === "Reports" && <Reports />}
-          {page === "User Management" && <UserManagement />}
+          {page === "User Settings" && <UserManagement />}
           {page === "Practice Settings" && <PracticeSettings />}
         </main>
       </div>
@@ -451,6 +439,14 @@ function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
         >
           <strong>Open appointments</strong>
           <small>Review the live schedule</small>
+        </button>
+        <button
+          type="button"
+          className="action-row"
+          onClick={() => navigate("Cases")}
+        >
+          <strong>Open cases</strong>
+          <small>Work from the active patient case queue</small>
         </button>
         <button
           type="button"
@@ -1483,13 +1479,16 @@ function Appointments({
   viewerProfile,
   onCheckIn,
   onHandoverToDentist,
-  onCompleteTreatment,
+  onOpenCases,
 }: {
   setNotice: (message: string) => void;
   viewerProfile: Profile;
-  onCheckIn: (appointmentId: string) => Promise<boolean> | boolean;
+  onCheckIn: (
+    appointmentId: string,
+    intake: { caseTitle: string; intakeNotes: string },
+  ) => Promise<boolean> | boolean;
   onHandoverToDentist: (appointmentId: string) => Promise<boolean> | boolean;
-  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
+  onOpenCases: () => void;
 }) {
   const [items, setItems] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -1499,8 +1498,8 @@ function Appointments({
   const [showForm, setShowForm] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "", providerId: "" });
-  const [treatmentDraft, setTreatmentDraft] = useState({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
-  const [noteDraft, setNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
+  const [checkInTarget, setCheckInTarget] = useState<Appointment | null>(null);
+  const [checkInDraft, setCheckInDraft] = useState({ caseTitle: "", intakeNotes: "" });
   const [appointmentView, setAppointmentView] = useState<"active" | "completed">("active");
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [workflowConfirmation, setWorkflowConfirmation] = useState<{
@@ -1512,13 +1511,6 @@ function Appointments({
   const [form, setForm] = useState({ patient_id: "", provider_id: "", appointment_date: "", appointment_time: "08:00", duration_minutes: "30", appointment_type: "checkup", reason: "" });
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
   const completedAppointments = items.filter((item) => item.status === "completed");
-  const dentistQueue = activeAppointments.filter(
-    (item) =>
-      viewerProfile.role === "dentist" &&
-      item.provider_id === viewerProfile.id &&
-      item.status === "in_progress" &&
-      !item.treatment_completed_at,
-  );
   useEffect(() => {
     if (!supabase) return;
     Promise.all([
@@ -1531,7 +1523,7 @@ function Appointments({
       supabase
         .from("appointments")
         .select(
-          "id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, patients(first_name, last_name)",
+          "id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, case_id, patients(first_name, last_name)",
         )
         .order("appointment_date")
         .order("appointment_time"),
@@ -1650,7 +1642,7 @@ function Appointments({
         provider_id: form.provider_id,
         created_by: auth.user?.id,
       })
-      .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, patients(first_name, last_name)")
+      .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, case_id, patients(first_name, last_name)")
       .single();
 
     if (insertError) {
@@ -1705,8 +1697,19 @@ function Appointments({
 
   const selectedAppointment = items.find((item) => item.id === selectedAppointmentId) ?? null;
 
-  async function runCheckIn(item: Appointment) {
-    const checkedIn = await onCheckIn(item.id);
+  function runCheckIn(item: Appointment) {
+    setCheckInTarget(item);
+    setCheckInDraft({
+      caseTitle: item.reason ?? `${item.appointment_type} case`,
+      intakeNotes: item.notes ?? "",
+    });
+  }
+
+  async function confirmCheckIn() {
+    if (!checkInTarget) return;
+
+    const item = checkInTarget;
+    const checkedIn = await onCheckIn(item.id, checkInDraft);
     if (!checkedIn) return;
 
     const actionTime = new Date().toISOString();
@@ -1717,15 +1720,18 @@ function Appointments({
               ...appointment,
               status: "confirmed",
               checked_in_at: appointment.checked_in_at ?? actionTime,
+              reason: checkInDraft.caseTitle.trim() || appointment.reason,
+              notes: checkInDraft.intakeNotes.trim() || appointment.notes,
             }
           : appointment,
       ),
     );
+    setCheckInTarget(null);
     setWorkflowConfirmation({
-      title: "Patient checked in",
+      title: "Patient checked in · Case ready",
       patientName: item.patient_name,
       time: actionTime,
-      detail: `Assigned to ${item.provider_name}. Next step: hand over the patient when the dentist is ready.`,
+      detail: `A case has been created or linked for this patient. Next step: hand it over to ${item.provider_name}.`,
     });
   }
 
@@ -1749,7 +1755,7 @@ function Appointments({
       title: "Handover complete",
       patientName: item.patient_name,
       time: actionTime,
-      detail: `${item.provider_name} can now see this patient in the dentist queue.`,
+      detail: `The case is now assigned to ${item.provider_name} and available in Cases.`,
     });
   }
 
@@ -1850,94 +1856,6 @@ function Appointments({
     setNotice("Appointment details saved");
   }
 
-  async function saveDentistTreatment() {
-    if (!supabase || !selectedAppointmentId || !selectedAppointment) return;
-
-    const procedureName = treatmentDraft.procedureName.trim();
-    if (!procedureName) {
-      setMessage("Add a procedure name before saving the treatment.");
-      return;
-    }
-
-    const { data: auth } = await supabase.auth.getUser();
-    const toothNumber = treatmentDraft.toothNumber.trim();
-    const { error } = await supabase.from("treatments").insert({
-      patient_id: selectedAppointment.patient_id,
-      appointment_id: selectedAppointmentId,
-      provider_id: auth.user?.id ?? null,
-      treatment_date: selectedAppointment.appointment_date,
-      tooth_number: toothNumber ? Number(toothNumber) : null,
-      procedure_name: procedureName,
-      description: treatmentDraft.notes.trim() || null,
-      cost: Number(treatmentDraft.cost || 0),
-      notes: treatmentDraft.notes.trim() || null,
-      status: "planned",
-      created_by: auth.user?.id ?? null,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    const activityTime = new Date().toISOString();
-    setItems((current) =>
-      current.map((appointment) =>
-        appointment.id === selectedAppointmentId
-          ? {
-              ...appointment,
-              clinical_updated_at: activityTime,
-              treatment_completed_at: null,
-            }
-          : appointment,
-      ),
-    );
-    setTreatmentDraft({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
-    setNotice("Treatment added. The appointment activity was updated for staff.");
-  }
-
-  async function saveDentistClinicalNote() {
-    if (!supabase || !selectedAppointmentId || !selectedAppointment) return;
-
-    const subjective = noteDraft.subjective.trim();
-    const assessment = noteDraft.assessment.trim();
-    const plan = noteDraft.plan.trim();
-
-    if (!subjective && !assessment && !plan) {
-      setMessage("Add at least one clinical note detail before saving.");
-      return;
-    }
-
-    const { data: auth } = await supabase.auth.getUser();
-    const { error } = await supabase.from("clinical_notes").insert({
-      patient_id: selectedAppointment.patient_id,
-      appointment_id: selectedAppointmentId,
-      author_id: auth.user?.id ?? null,
-      visit_type: noteDraft.visitType,
-      note_date: selectedAppointment.appointment_date,
-      subjective: subjective || null,
-      assessment: assessment || null,
-      plan: plan || null,
-      is_private: false,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    const activityTime = new Date().toISOString();
-    setItems((current) =>
-      current.map((appointment) =>
-        appointment.id === selectedAppointmentId
-          ? { ...appointment, clinical_updated_at: activityTime }
-          : appointment,
-      ),
-    );
-    setNoteDraft({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
-    setNotice("Clinical note saved. The appointment activity was updated for staff.");
-  }
-
   return (
     <section className="panel">
       <div className="panel-title">Appointment Calendar <button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ New Appointment</button></div>
@@ -1967,26 +1885,9 @@ function Appointments({
             {appointmentView === "active" ? (
               <>
                 <h3>Active appointments</h3>
-                {viewerProfile.role === "dentist" && (
-                  <div className="dentist-queue-banner">
-                    <strong>Dentist queue</strong>
-                    <span>
-                      {dentistQueue.length
-                        ? `${dentistQueue.length} patient${dentistQueue.length === 1 ? "" : "s"} handed over to you and ready for review.`
-                        : "No patients are currently handed over to you."}
-                    </span>
-                  </div>
-                )}
-                {activeAppointments.map((item) => (
+                                {activeAppointments.map((item) => (
                   <div
-                    className={
-                      viewerProfile.role === "dentist" &&
-                      item.provider_id === viewerProfile.id &&
-                      item.status === "in_progress" &&
-                      !item.treatment_completed_at
-                        ? "appointment-row dentist-ready"
-                        : "appointment-row"
-                    }
+                    className="appointment-row"
                     key={item.id}
                   >
                     <time>
@@ -1997,14 +1898,7 @@ function Appointments({
                       <span>
                         {item.appointment_type} with {item.provider_name}
                       </span>
-                      {viewerProfile.role === "dentist" &&
-                        item.provider_id === viewerProfile.id &&
-                        item.status === "in_progress" &&
-                        !item.treatment_completed_at && (
-                          <span className="dentist-ready-chip">
-                            {item.clinical_updated_at ? "In your session" : "Ready for you"}
-                          </span>
-                        )}
+
                       <small className="appointment-workflow-meta">
                         {item.treatment_completed_at
                           ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
@@ -2081,13 +1975,10 @@ function Appointments({
                         <button
                           type="button"
                           className="classic-button primary"
-                          onClick={async () => {
-                            const completed = await onCompleteTreatment(item.id);
-                            if (completed) setExpandedActionId(null);
-                          }}
-                          disabled={item.status !== "in_progress"}
+                          onClick={onOpenCases}
+                          disabled={!item.case_id}
                         >
-                          Complete treatment
+                          Open Cases
                         </button>
                         {canDeleteAppointment(item) && (
                           <button
@@ -2117,14 +2008,7 @@ function Appointments({
                       <span>
                         {item.appointment_type} with {item.provider_name}
                       </span>
-                      {viewerProfile.role === "dentist" &&
-                        item.provider_id === viewerProfile.id &&
-                        item.status === "in_progress" &&
-                        !item.treatment_completed_at && (
-                          <span className="dentist-ready-chip">
-                            {item.clinical_updated_at ? "In your session" : "Ready for you"}
-                          </span>
-                        )}
+
                       <small className="appointment-workflow-meta">
                         {item.treatment_completed_at
                           ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
@@ -2161,6 +2045,55 @@ function Appointments({
         </div>
       )}
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
+
+      {checkInTarget && (
+        <div className="modal-backdrop">
+          <section className="classic-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title">
+              Check In &amp; Create Case
+              <button type="button" onClick={() => setCheckInTarget(null)}>X</button>
+            </div>
+            <div className="dialog-body">
+              <p className="dialog-intro">
+                Enter the basic intake details for {checkInTarget.patient_name}. This creates a new case, or links this visit to the patient's current open case.
+              </p>
+              <label>
+                Case title / reason
+                <input
+                  value={checkInDraft.caseTitle}
+                  onChange={(event) =>
+                    setCheckInDraft((current) => ({ ...current, caseTitle: event.target.value }))
+                  }
+                  placeholder="e.g. Upper right tooth pain"
+                />
+              </label>
+              <label>
+                Reception intake notes
+                <textarea
+                  value={checkInDraft.intakeNotes}
+                  onChange={(event) =>
+                    setCheckInDraft((current) => ({ ...current, intakeNotes: event.target.value }))
+                  }
+                  placeholder="Basic symptoms, arrival notes, or information for the dentist"
+                />
+              </label>
+              <div className="dialog-actions">
+                <button type="button" className="classic-button" onClick={() => setCheckInTarget(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-button primary"
+                  disabled={!checkInDraft.caseTitle.trim()}
+                  onClick={() => void confirmCheckIn()}
+                >
+                  Check In &amp; Create Case
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {workflowConfirmation && (
         <div className="modal-backdrop workflow-confirmation-backdrop">
@@ -2229,15 +2162,18 @@ function Appointments({
               </div>
 
               <div className="appointment-session-panel">
-                <h3>Dentist session</h3>
+                <h3>Case workflow</h3>
+                <p className="dialog-intro">
+                  Check-in creates or links the patient case. Handover assigns that case to the selected dentist. Clinical notes and treatments are completed from Cases.
+                </p>
                 <div className="appointment-session-actions">
                   <button
                     type="button"
                     className="classic-button"
-                    onClick={() => void runCheckIn(selectedAppointment)}
+                    onClick={() => runCheckIn(selectedAppointment)}
                     disabled={!['scheduled', 'booked'].includes(selectedAppointment.status)}
                   >
-                    {selectedAppointment.status === "confirmed" || selectedAppointment.status === "in_progress" ? "Checked in" : "Check in"}
+                    {selectedAppointment.status === "confirmed" || selectedAppointment.status === "in_progress" ? "Checked in" : "Check in / create case"}
                   </button>
                   <button
                     type="button"
@@ -2250,13 +2186,10 @@ function Appointments({
                   <button
                     type="button"
                     className="classic-button primary"
-                    onClick={async () => {
-                      const completed = await onCompleteTreatment(selectedAppointment.id);
-                      if (completed) setSelectedAppointmentId(null);
-                    }}
-                    disabled={selectedAppointment.status !== "in_progress"}
+                    onClick={onOpenCases}
+                    disabled={!selectedAppointment.case_id}
                   >
-                    Complete treatment
+                    Open Cases
                   </button>
                 </div>
               </div>
@@ -2296,117 +2229,6 @@ function Appointments({
                   placeholder="Add clinical observations, symptoms, or follow-up notes"
                 />
               </label>
-
-              <div className="appointment-session-panel">
-                <h3>Add treatment</h3>
-                <div className="appointment-session-grid">
-                  <label>
-                    Procedure name
-                    <input
-                      value={treatmentDraft.procedureName}
-                      onChange={(event) =>
-                        setTreatmentDraft((current) => ({ ...current, procedureName: event.target.value }))
-                      }
-                      placeholder="e.g. Composite filling"
-                    />
-                  </label>
-                  <label>
-                    Tooth number
-                    <input
-                      type="number"
-                      min="11"
-                      max="48"
-                      value={treatmentDraft.toothNumber}
-                      onChange={(event) =>
-                        setTreatmentDraft((current) => ({ ...current, toothNumber: event.target.value }))
-                      }
-                      placeholder="18"
-                    />
-                  </label>
-                  <label>
-                    Cost
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={treatmentDraft.cost}
-                      onChange={(event) =>
-                        setTreatmentDraft((current) => ({ ...current, cost: event.target.value }))
-                      }
-                    />
-                  </label>
-                </div>
-                <label>
-                  Treatment notes
-                  <textarea
-                    value={treatmentDraft.notes}
-                    onChange={(event) =>
-                      setTreatmentDraft((current) => ({ ...current, notes: event.target.value }))
-                    }
-                    placeholder="Describe the procedure or treatment plan"
-                  />
-                </label>
-                <div className="dialog-actions">
-                  <button type="button" className="classic-button primary" onClick={saveDentistTreatment}>
-                    Save treatment
-                  </button>
-                </div>
-              </div>
-
-              <div className="appointment-session-panel">
-                <h3>Clinical note</h3>
-                <div className="appointment-session-grid">
-                  <label>
-                    Visit type
-                    <select
-                      value={noteDraft.visitType}
-                      onChange={(event) =>
-                        setNoteDraft((current) => ({ ...current, visitType: event.target.value }))
-                      }
-                    >
-                      <option value="consultation">Consultation</option>
-                      <option value="follow_up">Follow up</option>
-                      <option value="initial">Initial</option>
-                      <option value="emergency">Emergency</option>
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  Subjective
-                  <textarea
-                    value={noteDraft.subjective}
-                    onChange={(event) =>
-                      setNoteDraft((current) => ({ ...current, subjective: event.target.value }))
-                    }
-                    placeholder="Symptoms described by the patient"
-                  />
-                </label>
-                <label>
-                  Assessment
-                  <textarea
-                    value={noteDraft.assessment}
-                    onChange={(event) =>
-                      setNoteDraft((current) => ({ ...current, assessment: event.target.value }))
-                    }
-                    placeholder="Dentist assessment"
-                  />
-                </label>
-                <label>
-                  Plan
-                  <textarea
-                    value={noteDraft.plan}
-                    onChange={(event) =>
-                      setNoteDraft((current) => ({ ...current, plan: event.target.value }))
-                    }
-                    placeholder="Treatment or follow-up plan"
-                  />
-                </label>
-                <div className="dialog-actions">
-                  <button type="button" className="classic-button primary" onClick={saveDentistClinicalNote}>
-                    Save clinical note
-                  </button>
-                </div>
-              </div>
 
               <div className="dialog-actions">
                 {canDeleteAppointment(selectedAppointment) && (
@@ -3106,6 +2928,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       balance: number;
       status: string;
       patient_id: string;
+      case_id: string | null;
+      case_number: string;
       patient: string;
       email: string;
     }>
@@ -3139,6 +2963,7 @@ function Billing({ patient }: { patient: Patient | null }) {
       <tr key={item.id}>
         <td>{item.invoice_number}</td>
         <td>{item.patient}</td>
+        <td>{item.case_number}</td>
         <td>{item.invoice_date}</td>
         <td>{formatCurrency(Number(item.total))}</td>
         <td>{formatCurrency(Number(item.balance))}</td>
@@ -3188,7 +3013,7 @@ function Billing({ patient }: { patient: Patient | null }) {
     supabase
       .from("invoices")
       .select(
-        "id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)",
+        "id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)",
       )
       .order("invoice_date", { ascending: false })
       .then(({ data }) =>
@@ -3199,9 +3024,14 @@ function Billing({ patient }: { patient: Patient | null }) {
               last_name: string;
               email: string | null;
             } | null;
+            const caseData = item.cases as unknown as {
+              case_number: string;
+            } | null;
             return {
               ...item,
               patient_id: item.patient_id,
+              case_id: item.case_id ?? null,
+              case_number: caseData?.case_number ?? "-",
               patient: patientData
                 ? `${patientData.first_name} ${patientData.last_name}`
                 : "Unknown patient",
@@ -3251,8 +3081,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       setPaymentAmount("");
       setMessage(
         result.appointment_completed
-          ? "Payment recorded. The linked appointment is now complete."
-          : "Payment recorded.",
+          ? "Payment recorded. The linked workflow is now complete."
+          : "Payment recorded. Fully paid case invoices close their case automatically.",
       );
       refreshInvoiceList();
     } catch (reason) {
@@ -3264,9 +3094,9 @@ function Billing({ patient }: { patient: Patient | null }) {
     if (!supabase || !activePatient || !form.total) return;
     const { data: auth } = await supabase.auth.getUser();
     const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
+    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)").single();
     if (insertError) setMessage(insertError.message);
-    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
+    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; const linkedCase = data.cases as unknown as { case_number: string } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, case_id: data.case_id ?? null, case_number: linkedCase?.case_number ?? "-", patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
   }
   return (
     <section className="panel">
@@ -3315,6 +3145,7 @@ function Billing({ patient }: { patient: Patient | null }) {
               <tr>
                 <th>Invoice</th>
                 <th>Patient</th>
+                <th>Case</th>
                 <th>Date</th>
                 <th>Total</th>
                 <th>Balance</th>
