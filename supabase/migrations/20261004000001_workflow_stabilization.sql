@@ -183,6 +183,183 @@ $$;
 revoke all on function public.add_case_event(uuid, text, text, text, uuid, jsonb) from public;
 
 -- ============================================================
+-- Check-in now uses clinical Case status only
+-- ============================================================
+
+create or replace function public.check_in_appointment(
+  p_appointment_id uuid,
+  p_case_title text default null,
+  p_intake_notes text default null,
+  p_existing_case_id uuid default null,
+  p_create_new_case boolean default true
+)
+returns public.appointments
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  appointment_row public.appointments;
+  case_row public.cases;
+  caller_role public.app_role;
+  created_case boolean := false;
+begin
+  caller_role := public.current_user_role();
+
+  if caller_role is null or caller_role not in ('admin', 'dentist', 'receptionist') then
+    raise exception 'staff_profile_required';
+  end if;
+
+  select *
+  into appointment_row
+  from public.appointments
+  where id = p_appointment_id
+  for update;
+
+  if not found then
+    raise exception 'appointment_not_found';
+  end if;
+
+  if appointment_row.patient_id is null then
+    raise exception 'appointment_has_no_patient';
+  end if;
+
+  if appointment_row.status in ('cancelled', 'no_show', 'completed', 'open') then
+    raise exception 'appointment_cannot_be_checked_in_from_status_%', appointment_row.status;
+  end if;
+
+  update public.appointments
+  set
+    reason = coalesce(nullif(trim(p_case_title), ''), reason),
+    notes = coalesce(nullif(trim(p_intake_notes), ''), notes)
+  where id = p_appointment_id
+  returning * into appointment_row;
+
+  if appointment_row.case_id is not null then
+    select *
+    into case_row
+    from public.cases
+    where id = appointment_row.case_id
+    for update;
+
+  elsif p_existing_case_id is not null then
+    select *
+    into case_row
+    from public.cases
+    where id = p_existing_case_id
+      and patient_id = appointment_row.patient_id
+      and status in ('open', 'in_treatment', 'treatment_complete')
+    for update;
+
+    if not found then
+      raise exception 'selected_case_not_found_or_not_active';
+    end if;
+
+  elsif p_create_new_case then
+    insert into public.cases (
+      patient_id,
+      primary_appointment_id,
+      assigned_provider_id,
+      title,
+      intake_notes,
+      status,
+      billing_status,
+      created_by,
+      last_activity_at
+    )
+    values (
+      appointment_row.patient_id,
+      appointment_row.id,
+      appointment_row.provider_id,
+      coalesce(
+        nullif(trim(p_case_title), ''),
+        nullif(trim(appointment_row.reason), ''),
+        initcap(replace(appointment_row.appointment_type, '_', ' ')) || ' case'
+      ),
+      coalesce(nullif(trim(p_intake_notes), ''), appointment_row.notes),
+      'open',
+      'not_billed',
+      auth.uid(),
+      now()
+    )
+    returning * into case_row;
+
+    created_case := true;
+  else
+    raise exception 'case_selection_required';
+  end if;
+
+  if appointment_row.case_id is null then
+    update public.appointments
+    set case_id = case_row.id
+    where id = p_appointment_id
+    returning * into appointment_row;
+  end if;
+
+  if appointment_row.status not in ('confirmed', 'in_progress') then
+    update public.appointments
+    set
+      status = 'confirmed',
+      checked_in_at = coalesce(checked_in_at, now()),
+      updated_at = now()
+    where id = p_appointment_id
+    returning * into appointment_row;
+  elsif appointment_row.checked_in_at is null then
+    update public.appointments
+    set checked_in_at = now(),
+        updated_at = now()
+    where id = p_appointment_id
+    returning * into appointment_row;
+  end if;
+
+  update public.cases
+  set
+    assigned_provider_id = coalesce(assigned_provider_id, appointment_row.provider_id),
+    status = case
+      when status = 'treatment_complete' then 'open'
+      else status
+    end,
+    last_activity_at = now(),
+    updated_at = now()
+  where id = case_row.id;
+
+  if created_case then
+    insert into public.audit_events (actor_id, action, entity_type, entity_id, details)
+    values (
+      auth.uid(),
+      'case_created',
+      'case',
+      case_row.id,
+      jsonb_build_object(
+        'patient_id', appointment_row.patient_id,
+        'appointment_id', appointment_row.id,
+        'case_number', case_row.case_number
+      )
+    );
+  end if;
+
+  insert into public.audit_events (actor_id, action, entity_type, entity_id, details)
+  values (
+    auth.uid(),
+    'appointment_checked_in',
+    'appointment',
+    p_appointment_id,
+    jsonb_build_object(
+      'patient_id', appointment_row.patient_id,
+      'case_id', case_row.id,
+      'case_number', case_row.case_number,
+      'case_created', created_case
+    )
+  );
+
+  return appointment_row;
+end;
+$;
+
+revoke all on function public.check_in_appointment(uuid, text, text, uuid, boolean) from public;
+grant execute on function public.check_in_appointment(uuid, text, text, uuid, boolean) to authenticated;
+
+-- ============================================================
 -- Billing state is derived independently from clinical state
 -- ============================================================
 
