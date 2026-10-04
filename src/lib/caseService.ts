@@ -13,6 +13,15 @@ export type CaseBillingStatus =
   | "paid";
 
 export type CasePriority = "low" | "normal" | "high" | "urgent";
+export type TreatmentPlanStatus =
+  | "proposed"
+  | "accepted"
+  | "in_progress"
+  | "completed"
+  | "deferred"
+  | "cancelled";
+
+export type CaseTaskPriority = "low" | "normal" | "high" | "urgent";
 
 export type CompleteVisitResult = {
   case_id: string;
@@ -45,9 +54,10 @@ export async function completeCaseVisit(caseId: string, appointmentId: string) {
   return data as CompleteVisitResult;
 }
 
-export async function closeCase(caseId: string) {
+export async function closeCase(caseId: string, recallMonths = 6) {
   const { data, error } = await client().rpc("close_case_workflow", {
     p_case_id: caseId,
+    p_recall_months: recallMonths,
   });
 
   if (error) throw new Error(error.message);
@@ -142,4 +152,118 @@ export async function addCaseTreatment(input: {
   });
 
   if (error) throw new Error(error.message);
+}
+
+
+export async function addTreatmentPlanItem(input: {
+  caseId: string;
+  procedureName: string;
+  toothNumber?: number | null;
+  estimatedCost: number;
+  notes?: string;
+  sequenceNo?: number;
+  createdBy: string;
+}) {
+  const { data, error } = await client()
+    .from("treatment_plan_items")
+    .insert({
+      case_id: input.caseId,
+      procedure_name: input.procedureName.trim(),
+      tooth_number: input.toothNumber ?? null,
+      estimated_cost: input.estimatedCost,
+      notes: input.notes?.trim() || null,
+      sequence_no: input.sequenceNo ?? 1,
+      status: "proposed",
+      created_by: input.createdBy,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateTreatmentPlanStatus(
+  planItemId: string,
+  status: TreatmentPlanStatus,
+) {
+  const patch: Record<string, unknown> = { status };
+
+  if (status === "accepted") patch.accepted_at = new Date().toISOString();
+  if (status === "completed") patch.completed_at = new Date().toISOString();
+
+  const { data, error } = await client()
+    .from("treatment_plan_items")
+    .update(patch)
+    .eq("id", planItemId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function performTreatmentPlanItem(
+  planItemId: string,
+  appointmentId: string,
+) {
+  const { data, error } = await client().rpc("perform_treatment_plan_item", {
+    p_plan_item_id: planItemId,
+    p_appointment_id: appointmentId,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function addCaseTask(input: {
+  caseId: string;
+  title: string;
+  description?: string;
+  priority?: CaseTaskPriority;
+  dueAt?: string | null;
+  appointmentId?: string | null;
+}) {
+  const { data, error } = await client().rpc("upsert_case_task", {
+    p_case_id: input.caseId,
+    p_task_type: "manual",
+    p_title: input.title.trim(),
+    p_description: input.description?.trim() || null,
+    p_priority: input.priority ?? "normal",
+    p_due_at: input.dueAt || null,
+    p_appointment_id: input.appointmentId || null,
+    p_dedupe_key: null,
+    p_source: "manual",
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function completeCaseTask(taskId: string) {
+  const { data, error } = await client().rpc("complete_case_task", {
+    p_task_id: taskId,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function schedulePatientRecall(input: {
+  patientId: string;
+  caseId?: string | null;
+  intervalMonths: number;
+  recallType?: "preventive" | "follow_up";
+  notes?: string;
+}) {
+  const { data, error } = await client().rpc("schedule_patient_recall", {
+    p_patient_id: input.patientId,
+    p_case_id: input.caseId ?? null,
+    p_interval_months: input.intervalMonths,
+    p_recall_type: input.recallType ?? "preventive",
+    p_notes: input.notes?.trim() || null,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
 }
