@@ -998,6 +998,7 @@ export function Cases({
                         disabled={
                           selectedCase.status === "closed" ||
                           !selectedVisit ||
+                          selectedVisit.status !== "in_progress" ||
                           saving
                         }
                         onClick={() => setShowClinicalForm((current) => !current)}
