@@ -668,6 +668,38 @@ after insert or update of status, balance, amount_paid
 on public.invoices
 for each row execute function public.sync_case_from_invoice();
 
+-- Keep legacy appointment-based writes connected to their Case. This lets
+-- existing patient-history forms continue to work while the UI moves to Cases.
+create or replace function public.inherit_case_from_appointment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if new.case_id is null and new.appointment_id is not null then
+    select a.case_id
+    into new.case_id
+    from public.appointments a
+    where a.id = new.appointment_id;
+  end if;
+
+  return new;
+end;
+$;
+
+drop trigger if exists clinical_notes_inherit_case on public.clinical_notes;
+create trigger clinical_notes_inherit_case
+before insert or update of appointment_id, case_id
+on public.clinical_notes
+for each row execute function public.inherit_case_from_appointment();
+
+drop trigger if exists treatments_inherit_case on public.treatments;
+create trigger treatments_inherit_case
+before insert or update of appointment_id, case_id
+on public.treatments
+for each row execute function public.inherit_case_from_appointment();
+
 -- New case-scoped clinical records touch the Case for queue ordering.
 create or replace function public.touch_case_from_clinical_activity()
 returns trigger
