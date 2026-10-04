@@ -418,7 +418,7 @@ function Patients({
   } | null>(null);
   const [caseTab, setCaseTab] = useState<CaseTab>(null);
   useEffect(() => {
-    setCaseTab(null);
+    setCaseTab(selected ? "cases" : null);
   }, [selected?.id]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({
@@ -2057,55 +2057,100 @@ function PatientCaseWorkspace({
   patient,
   caseTab,
   setCaseTab,
-  onCompleteTreatment: _onCompleteTreatment,
-  upcomingAppointment: _upcomingAppointment,
+  onOpenCase,
   setNotice,
 }: {
   patient: Patient | null;
   caseTab: CaseTab;
   setCaseTab: (value: CaseTab) => void;
-  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
-  upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; notes: string | null; provider_name: string | null } | null;
+  onOpenCase: (caseId: string) => void;
   setNotice: (message: string) => void;
 }) {
   const [visitHistory, setVisitHistory] = useState<PatientVisitHistory[]>([]);
+  const [patientCases, setPatientCases] = useState<
+    Array<{
+      id: string;
+      case_number: string;
+      title: string;
+      status: string;
+      billing_status: string;
+      priority: string;
+      assigned_provider_id: string | null;
+      assigned_provider_name: string;
+      last_activity_at: string;
+    }>
+  >([]);
   const [selectedHistoryAppointmentId, setSelectedHistoryAppointmentId] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState("");
 
   useEffect(() => {
-    if (!patient) {
+    if (!patient || !supabase) {
       setVisitHistory([]);
+      setPatientCases([]);
       setSelectedHistoryAppointmentId(null);
       return;
     }
 
-    getPatientVisitHistory(patient.id)
-      .then((entries) => {
-        setVisitHistory(entries);
+    Promise.all([
+      getPatientVisitHistory(patient.id),
+      supabase
+        .from("cases")
+        .select(
+          "id, case_number, title, status, billing_status, priority, assigned_provider_id, last_activity_at",
+        )
+        .eq("patient_id", patient.id)
+        .order("last_activity_at", { ascending: false }),
+      listActiveProviders(),
+    ])
+      .then(([history, caseResult, providers]) => {
+        if (caseResult.error) throw new Error(caseResult.error.message);
+
+        setVisitHistory(history);
         setHistoryError("");
         setSelectedHistoryAppointmentId((currentSelection) => {
-          if (!entries.length) return null;
-          if (currentSelection && entries.some((item) => item.appointment_id === currentSelection)) {
+          if (!history.length) return null;
+          if (
+            currentSelection &&
+            history.some((item) => item.appointment_id === currentSelection)
+          ) {
             return currentSelection;
           }
-          return entries[0].appointment_id;
+          return history[0].appointment_id;
         });
+
+        setPatientCases(
+          (caseResult.data ?? []).map((item) => ({
+            ...item,
+            assigned_provider_name:
+              providers.find((provider) => provider.id === item.assigned_provider_id)
+                ?.full_name ?? "Unassigned",
+          })),
+        );
       })
       .catch((reason) => {
         setVisitHistory([]);
-        setHistoryError(reason instanceof Error ? reason.message : "Patient history could not be loaded.");
+        setPatientCases([]);
+        setHistoryError(
+          reason instanceof Error
+            ? reason.message
+            : "Patient history could not be loaded.",
+        );
       });
   }, [patient]);
 
   return (
     <section className="panel patient-case-workspace">
       <div className="panel-title">
-        Patient Case Workspace
-        <span>{patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}</span>
+        <span>Patient Record</span>
+        <span className="panel-title-hint">
+          {patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}
+        </span>
       </div>
+
       <div className="tab-strip">
         {[
-          { id: "history", label: "History" },
+          { id: "cases", label: "Cases" },
+          { id: "history", label: "Visit History" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
@@ -2119,101 +2164,215 @@ function PatientCaseWorkspace({
         ))}
       </div>
 
-      {caseTab === null ? (
+      {caseTab === "cases" ? (
         <div className="patient-case-body">
-          <div className="empty-state">Select a patient history or dental chart view.</div>
+          <div className="patient-case-list">
+            {patientCases.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className="patient-case-card"
+                onClick={() => onOpenCase(item.id)}
+              >
+                <span className="patient-case-card-heading">
+                  <strong>{item.case_number}</strong>
+                  <span className={`case-priority priority-${item.priority}`}>
+                    {item.priority}
+                  </span>
+                </span>
+                <strong>{item.title}</strong>
+                <span>
+                  Clinical: {item.status.replaceAll("_", " ")} · Billing:{" "}
+                  {item.billing_status.replaceAll("_", " ")}
+                </span>
+                <small>
+                  {item.assigned_provider_name} · Last activity{" "}
+                  {new Date(item.last_activity_at).toLocaleString()}
+                </small>
+              </button>
+            ))}
+
+            {!patientCases.length && (
+              <div className="empty-state">
+                No cases for this patient yet. A case is created during check-in.
+              </div>
+            )}
+          </div>
         </div>
       ) : caseTab === "history" ? (
         <div className="patient-case-body">
           {historyError && <p className="send-error">{historyError}</p>}
           {(() => {
             const selectedVisit =
-              visitHistory.find((entry) => entry.appointment_id === selectedHistoryAppointmentId) ??
+              visitHistory.find(
+                (entry) => entry.appointment_id === selectedHistoryAppointmentId,
+              ) ??
               visitHistory[0] ??
               null;
 
             return (
               <div className="case-columns">
                 <div className="case-column">
-                  <h3>Appointment history</h3>
-                  {visitHistory.length ? visitHistory.map((entry) => (
-                    <button
-                      key={entry.appointment_id}
-                      type="button"
-                      className={selectedVisit?.appointment_id === entry.appointment_id ? "history-selector active" : "history-selector"}
-                      onClick={() => setSelectedHistoryAppointmentId(entry.appointment_id)}
-                    >
-                      <div className="history-selector-header">
-                        <strong>{entry.appointment_date}</strong>
-                        <span>{entry.appointment_type}</span>
-                      </div>
-                      <small>{entry.appointment_time} · {appointmentStatusLabel(entry.appointment_status)}</small>
-                      <p>{entry.reason || "No chief complaint recorded."}</p>
-                    </button>
-                  )) : <div className="empty-state">No appointment history saved for this patient yet.</div>}
+                  <h3>Visit history</h3>
+                  {visitHistory.length ? (
+                    visitHistory.map((entry) => (
+                      <button
+                        key={entry.appointment_id}
+                        type="button"
+                        className={
+                          selectedVisit?.appointment_id === entry.appointment_id
+                            ? "history-selector active"
+                            : "history-selector"
+                        }
+                        onClick={() =>
+                          setSelectedHistoryAppointmentId(entry.appointment_id)
+                        }
+                      >
+                        <div className="history-selector-header">
+                          <strong>{entry.appointment_date}</strong>
+                          <span>{entry.appointment_type}</span>
+                        </div>
+                        <small>
+                          {entry.appointment_time} ·{" "}
+                          {appointmentStatusLabel(entry.appointment_status)}
+                        </small>
+                        <p>{entry.reason || "No chief complaint recorded."}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      No appointment history saved for this patient yet.
+                    </div>
+                  )}
                 </div>
 
                 <div className="case-column">
                   {selectedVisit ? (
                     <>
-                      <h3>{selectedVisit.appointment_date} · {selectedVisit.appointment_time}</h3>
+                      <h3>
+                        {selectedVisit.appointment_date} ·{" "}
+                        {selectedVisit.appointment_time}
+                      </h3>
                       <div className="case-note">
-                        <div className="note-meta"><strong>Appointment</strong><span>{selectedVisit.appointment_type}</span></div>
-                        <p><strong>Status:</strong> {appointmentStatusLabel(selectedVisit.appointment_status)}</p>
-                        <p><strong>Dentist:</strong> {selectedVisit.provider_name ?? "Unassigned"}</p>
+                        <div className="note-meta">
+                          <strong>Appointment</strong>
+                          <span>{selectedVisit.appointment_type}</span>
+                        </div>
+                        <p>
+                          <strong>Status:</strong>{" "}
+                          {appointmentStatusLabel(selectedVisit.appointment_status)}
+                        </p>
+                        <p>
+                          <strong>Dentist:</strong>{" "}
+                          {selectedVisit.provider_name ?? "Unassigned"}
+                        </p>
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Reason for visit</strong></div>
-                        <p>{selectedVisit.reason || "No chief complaint recorded."}</p>
+                        <div className="note-meta">
+                          <strong>Reason for visit</strong>
+                        </div>
+                        <p>
+                          {selectedVisit.reason || "No chief complaint recorded."}
+                        </p>
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Assistant notes</strong></div>
-                        <p>{selectedVisit.notes || "No assistant observations recorded."}</p>
+                        <div className="note-meta">
+                          <strong>Treatments / procedures</strong>
+                          <span>{selectedVisit.treatments.length}</span>
+                        </div>
+                        {selectedVisit.treatments.length ? (
+                          selectedVisit.treatments.map((treatment) => (
+                            <p key={treatment.id}>
+                              <strong>{treatment.procedure_name}</strong>
+                              {treatment.tooth_number
+                                ? ` · Tooth ${treatment.tooth_number}`
+                                : ""}
+                              {` · ${formatCurrency(Number(treatment.cost))} · ${treatment.status}`}
+                            </p>
+                          ))
+                        ) : (
+                          <p>No treatment details are available for this visit.</p>
+                        )}
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Treatments / procedures</strong><span>{selectedVisit.treatments.length}</span></div>
-                        {selectedVisit.treatments.length ? selectedVisit.treatments.map((treatment) => (
-                          <p key={treatment.id}>
-                            <strong>{treatment.procedure_name}</strong>
-                            {treatment.tooth_number ? ` · Tooth ${treatment.tooth_number}` : ""}
-                            {` · ${formatCurrency(Number(treatment.cost))} · ${treatment.status}`}
-                          </p>
-                        )) : <p>No treatment details are available for your role or this visit.</p>}
+                        <div className="note-meta">
+                          <strong>Clinical notes</strong>
+                          <span>{selectedVisit.clinical_notes.length}</span>
+                        </div>
+                        {selectedVisit.clinical_notes.length ? (
+                          selectedVisit.clinical_notes.map((note) => (
+                            <div key={note.id}>
+                              <p>
+                                <strong>{note.visit_type}</strong> · {note.note_date}
+                              </p>
+                              {note.subjective && (
+                                <p>
+                                  <strong>Subjective:</strong> {note.subjective}
+                                </p>
+                              )}
+                              {note.assessment && (
+                                <p>
+                                  <strong>Assessment:</strong> {note.assessment}
+                                </p>
+                              )}
+                              {note.plan && (
+                                <p><strong>Plan:</strong> {note.plan}</p>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p>No clinical notes are available for this visit.</p>
+                        )}
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Clinical notes</strong><span>{selectedVisit.clinical_notes.length}</span></div>
-                        {selectedVisit.clinical_notes.length ? selectedVisit.clinical_notes.map((note) => (
-                          <div key={note.id}>
-                            <p><strong>{note.visit_type}</strong> · {note.note_date}</p>
-                            {note.subjective && <p><strong>Subjective:</strong> {note.subjective}</p>}
-                            {note.assessment && <p><strong>Assessment:</strong> {note.assessment}</p>}
-                            {note.plan && <p><strong>Plan:</strong> {note.plan}</p>}
-                          </div>
-                        )) : <p>No clinical notes are available for your role or this visit.</p>}
-                      </div>
-                      <div className="case-note">
-                        <div className="note-meta"><strong>Billing</strong><span>{selectedVisit.invoice?.status ?? "No invoice"}</span></div>
+                        <div className="note-meta">
+                          <strong>Billing</strong>
+                          <span>
+                            {selectedVisit.invoice?.status ?? "No invoice"}
+                          </span>
+                        </div>
                         {selectedVisit.invoice ? (
                           <>
                             <p><strong>{selectedVisit.invoice.invoice_number}</strong></p>
-                            <p>Total: {formatCurrency(Number(selectedVisit.invoice.total))}</p>
-                            <p>Paid: {formatCurrency(Number(selectedVisit.invoice.amount_paid))}</p>
-                            <p>Balance: {formatCurrency(Number(selectedVisit.invoice.balance))}</p>
+                            <p>
+                              Total:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.total))}
+                            </p>
+                            <p>
+                              Paid:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.amount_paid))}
+                            </p>
+                            <p>
+                              Balance:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.balance))}
+                            </p>
                           </>
-                        ) : <p>No invoice is linked to this appointment.</p>}
+                        ) : (
+                          <p>No invoice is linked to this appointment.</p>
+                        )}
                       </div>
                     </>
                   ) : (
-                    <div className="empty-state">Select an appointment to view the connected visit history.</div>
+                    <div className="empty-state">
+                      Select an appointment to view the connected visit history.
+                    </div>
                   )}
                 </div>
               </div>
             );
           })()}
         </div>
-      ) : (
+      ) : caseTab === "chart" ? (
         <div className="patient-case-body">
           <DentalChart patient={patient} setNotice={setNotice} />
+        </div>
+      ) : (
+        <div className="patient-case-body">
+          <div className="empty-state">Select a patient record view.</div>
         </div>
       )}
     </section>
