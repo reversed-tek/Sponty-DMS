@@ -20,13 +20,13 @@ import { PatientPortal } from "./components/PatientPortal";
 import { SearchableSelect } from "./components/SearchableSelect";
 import { Cases } from "./components/Cases";
 import { Dashboard } from "./components/Dashboard";
+import { AppointmentProgress } from "./components/AppointmentProgress";
 
 type Page =
   | "Dashboard"
   | "Patients"
   | "Appointments"
   | "Cases"
-  | "Treatments"
   | "Billing"
   | "Reports"
   | "User Settings"
@@ -95,13 +95,6 @@ const toothNumbers = [
 const queryError = (error: { message: string } | null) => error?.message ?? "";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
-const formatWorkflowTime = (value: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-PH", {
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date(value))
-    : "";
 const roleLabel = (role: string) =>
   role === "admin"
     ? "System Administrator"
@@ -358,9 +351,6 @@ function App() {
               initialCaseId={requestedCaseId}
               onInitialCaseHandled={() => setRequestedCaseId(null)}
             />
-          )}
-          {page === "Treatments" && (
-            <Treatments patient={selectedPatient} setNotice={setNotice} />
           )}
           {page === "Billing" && <Billing patient={selectedPatient} />}
           {page === "Reports" && <Reports />}
@@ -1594,17 +1584,12 @@ function Appointments({
                         {item.appointment_type} with {item.provider_name}
                       </span>
 
-                      <small className="appointment-workflow-meta">
-                        {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                          : item.clinical_updated_at
-                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
-                            : item.handed_over_at
-                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
-                              : item.checked_in_at
-                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
-                                : "Not checked in"}
-                      </small>
+                      <AppointmentProgress
+                        status={item.status}
+                        checkedInAt={item.checked_in_at}
+                        handedOverAt={item.handed_over_at}
+                        treatmentCompletedAt={item.treatment_completed_at}
+                      />
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
@@ -1704,17 +1689,12 @@ function Appointments({
                         {item.appointment_type} with {item.provider_name}
                       </span>
 
-                      <small className="appointment-workflow-meta">
-                        {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                          : item.clinical_updated_at
-                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
-                            : item.handed_over_at
-                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
-                              : item.checked_in_at
-                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
-                                : "Not checked in"}
-                      </small>
+                      <AppointmentProgress
+                        status={item.status}
+                        checkedInAt={item.checked_in_at}
+                        handedOverAt={item.handed_over_at}
+                        treatmentCompletedAt={item.treatment_completed_at}
+                      />
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
@@ -2497,367 +2477,6 @@ function DentalChart({
   );
 }
 
-function Treatments({
-  patient,
-  setNotice,
-}: {
-  patient: Patient | null;
-  setNotice: (message: string) => void;
-}) {
-  const [items, setItems] = useState<
-    Array<{
-      id: string;
-      patient_id: string;
-      treatment_date: string;
-      procedure_name: string;
-      tooth_number: number | null;
-      cost: number;
-      status: string;
-      notes: string | null;
-      patients: { first_name: string; last_name: string } | null;
-    }>
-  >([]);
-  const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(patient?.id ?? "");
-  const [showForm, setShowForm] = useState(false);
-  const [editingTreatment, setEditingTreatment] = useState<(typeof items)[number] | null>(null);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    procedure_name: "",
-    tooth_number: "",
-    cost: "",
-    status: "planned",
-    notes: "",
-  });
-
-  const activePatient =
-    patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
-  const visibleItems = activePatient
-    ? items.filter((item) => item.patient_id === activePatient.id)
-    : [];
-
-  const resetForm = () =>
-    setForm({
-      procedure_name: "",
-      tooth_number: "",
-      cost: "",
-      status: "planned",
-      notes: "",
-    });
-
-  useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("patients")
-      .select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies")
-      .eq("is_active", true)
-      .order("last_name")
-      .then(({ data }) => {
-        const nextPatients = data ?? [];
-        setPatientOptions(nextPatients);
-        if (patient && !selectedPatientId) setSelectedPatientId(patient.id);
-        if (patient && !nextPatients.some((option) => option.id === patient.id)) {
-          setSelectedPatientId(patient.id);
-        }
-      });
-
-    const activeId = selectedPatientId || patient?.id;
-    if (!activeId) {
-      setItems([]);
-      return;
-    }
-
-    supabase
-      .from("treatments")
-      .select(
-        "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
-      )
-      .eq("patient_id", activeId)
-      .order("treatment_date", { ascending: false })
-      .then(({ data, error: fetchError }) => {
-        setItems((data ?? []) as unknown as typeof items);
-        if (fetchError) setError(fetchError.message);
-      });
-  }, [patient, selectedPatientId]);
-
-  const openNewTreatment = () => {
-    if (!activePatient) return;
-    setEditingTreatment(null);
-    resetForm();
-    setShowForm(true);
-  };
-
-  const openEditTreatment = (item: (typeof items)[number]) => {
-    setEditingTreatment(item);
-    setForm({
-      procedure_name: item.procedure_name,
-      tooth_number: item.tooth_number?.toString() ?? "",
-      cost: String(item.cost),
-      status: item.status,
-      notes: item.notes ?? "",
-    });
-    setShowForm(true);
-  };
-
-  async function saveTreatment() {
-    if (!supabase || !activePatient) return;
-    if (!form.procedure_name) return;
-
-    const payload = {
-      patient_id: editingTreatment?.patient_id ?? activePatient.id,
-      procedure_name: form.procedure_name.trim(),
-      tooth_number: form.tooth_number ? Number(form.tooth_number) : null,
-      cost: Number(form.cost || 0),
-      status: form.status,
-      notes: form.notes.trim() || null,
-    };
-
-    if (editingTreatment) {
-      const { error: updateError } = await supabase
-        .from("treatments")
-        .update(payload)
-        .eq("id", editingTreatment.id);
-
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
-
-      setItems((current) =>
-        current.map((item) =>
-          item.id === editingTreatment.id
-            ? { ...item, ...payload, cost: Number(payload.cost) }
-            : item,
-        ),
-      );
-      setNotice("Treatment updated");
-    } else {
-      const { data: auth } = await supabase.auth.getUser();
-      const { data, error: insertError } = await supabase
-        .from("treatments")
-        .insert({
-          ...payload,
-          provider_id: auth.user?.id,
-          created_by: auth.user?.id,
-        })
-        .select(
-          "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
-        )
-        .single();
-
-      if (insertError) {
-        setError(insertError.message);
-        return;
-      }
-
-      if (data) {
-        setItems((current) => [data as unknown as (typeof items)[number], ...current]);
-      }
-      setNotice("Treatment saved");
-    }
-
-    setShowForm(false);
-    setEditingTreatment(null);
-    resetForm();
-  }
-
-  async function deleteTreatment(id: string) {
-    if (!supabase) return;
-    const target = items.find((item) => item.id === id);
-    if (!target) return;
-
-    const confirmed = window.confirm(
-      `Delete the ${target.procedure_name} treatment record?`,
-    );
-    if (!confirmed) return;
-
-    const { error: deleteError } = await supabase
-      .from("treatments")
-      .delete()
-      .eq("id", id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
-    }
-
-    setItems((current) => current.filter((item) => item.id !== id));
-    setNotice("Treatment deleted");
-  }
-
-  return (
-    <section className="panel">
-      <div className="panel-title">
-        Treatment Register{" "}
-        <button
-          type="button"
-          className="classic-button primary"
-          onClick={openNewTreatment}
-          disabled={!activePatient}
-        >
-          + New Treatment
-        </button>
-      </div>
-      <div className="filter-row">
-        <label>
-          Patient
-          <SearchableSelect
-            value={selectedPatientId}
-            onChange={setSelectedPatientId}
-            placeholder="Select patient"
-            searchPlaceholder="Search patient name or number..."
-            emptyMessage="No patients match your search."
-            options={patientOptions.map((option) => ({
-              value: option.id,
-              label: `${option.first_name} ${option.last_name}`,
-              description: option.patient_number,
-              searchText: `${option.patient_number} ${option.first_name} ${option.last_name} ${option.phone ?? ""} ${option.email ?? ""}`,
-            }))}
-          />
-        </label>
-      </div>
-      {error && <p className="send-error">{error}</p>}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Patient</th>
-              <th>Procedure</th>
-              <th>Tooth</th>
-              <th>Cost</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item) => (
-              <tr key={item.id}>
-                <td>{item.treatment_date}</td>
-                <td>
-                  {item.patients
-                    ? `${item.patients.first_name} ${item.patients.last_name}`
-                    : "-"}
-                </td>
-                <td>{item.procedure_name}</td>
-                <td>{item.tooth_number ?? "-"}</td>
-                <td>{formatCurrency(Number(item.cost))}</td>
-                <td>
-                  <span className="status-badge">{item.status}</span>
-                </td>
-                <td>
-                  <div className="dialog-actions">
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => openEditTreatment(item)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => deleteTreatment(item.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!visibleItems.length && (
-          <div className="empty-state">No treatments found for this patient.</div>
-        )}
-      </div>
-      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before adding a treatment.</p>}
-      {showForm && (
-        <div className="modal-backdrop">
-          <section className="classic-dialog" role="dialog" aria-modal="true">
-            <div className="dialog-title">
-              {editingTreatment ? "Edit Treatment" : "New Treatment"}{" "}
-              <button type="button" onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}>
-                X
-              </button>
-            </div>
-            <div className="dialog-body">
-              <p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p>
-              <label>
-                Procedure name
-                <input
-                  value={form.procedure_name}
-                  onChange={(event) =>
-                    setForm({ ...form, procedure_name: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Tooth number
-                <input
-                  type="number"
-                  min="11"
-                  max="48"
-                  value={form.tooth_number}
-                  onChange={(event) =>
-                    setForm({ ...form, tooth_number: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Cost
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.cost}
-                  onChange={(event) => setForm({ ...form, cost: event.target.value })}
-                />
-              </label>
-              <label>
-                Status
-                <select
-                  value={form.status}
-                  onChange={(event) => setForm({ ...form, status: event.target.value })}
-                >
-                  <option value="planned">Planned</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-              <label>
-                Notes
-                <textarea
-                  value={form.notes}
-                  onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                />
-              </label>
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  className="classic-button"
-                  onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="classic-button primary"
-                  disabled={!form.procedure_name}
-                  onClick={saveTreatment}
-                >
-                  {editingTreatment ? "Save Changes" : "Save Treatment"}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Billing({ patient }: { patient: Patient | null }) {
   const [items, setItems] = useState<
     Array<{
@@ -2886,15 +2505,13 @@ function Billing({ patient }: { patient: Patient | null }) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [message, setMessage] = useState("");
-  const [showForm, setShowForm] = useState(false);
   const [invoiceView, setInvoiceView] = useState<"pending" | "paid">("pending");
-  const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
 
   const activePatient =
     patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
   const filteredByPatient = activePatient
     ? items.filter((item) => item.patient_id === activePatient.id)
-    : [];
+    : items;
   const pendingInvoices = filteredByPatient.filter((item) => item.status !== "paid");
   const paidInvoices = filteredByPatient.filter((item) => item.status === "paid");
   const visibleInvoices = invoiceView === "pending" ? pendingInvoices : paidInvoices;
@@ -3021,9 +2638,9 @@ function Billing({ patient }: { patient: Patient | null }) {
       setPaymentInvoice(null);
       setPaymentAmount("");
       setMessage(
-        result.appointment_completed
-          ? "Payment recorded. The linked workflow is now complete."
-          : "Payment recorded. Fully paid case invoices close their case automatically.",
+        result.case_billing_status
+          ? `Payment recorded. Case billing is now ${result.case_billing_status.replaceAll("_", " ")}. Clinical status is unchanged.`
+          : "Payment recorded.",
       );
       refreshInvoiceList();
     } catch (reason) {
@@ -3031,24 +2648,33 @@ function Billing({ patient }: { patient: Patient | null }) {
     }
   }
 
-  async function addInvoice() {
-    if (!supabase || !activePatient || !form.total) return;
-    const { data: auth } = await supabase.auth.getUser();
-    const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)").single();
-    if (insertError) setMessage(insertError.message);
-    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; const linkedCase = data.cases as unknown as { case_number: string } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, case_id: data.case_id ?? null, case_number: linkedCase?.case_number ?? "-", patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
-  }
   return (
-    <section className="panel">
-      <div className="panel-title">Invoice Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!activePatient}>+ New Invoice</button></div>
-      <div className="filter-row">
+    <section className="panel billing-workspace">
+      <div className="panel-title">
+        <span>Billing</span>
+        <span className="panel-title-hint">Invoices are generated from completed Case visits</span>
+      </div>
+      <div className="billing-summary-strip">
+        <div>
+          <span>Pending invoices</span>
+          <strong>{pendingInvoices.length}</strong>
+        </div>
+        <div>
+          <span>Outstanding</span>
+          <strong>{formatCurrency(pendingInvoices.reduce((sum, item) => sum + Number(item.balance), 0))}</strong>
+        </div>
+        <div>
+          <span>Paid invoices</span>
+          <strong>{paidInvoices.length}</strong>
+        </div>
+      </div>
+      <div className="filter-row billing-filter-row">
         <label>
-          Patient
+          Patient filter
           <SearchableSelect
             value={selectedPatientId}
             onChange={setSelectedPatientId}
-            placeholder="Select patient"
+            placeholder="All patients"
             searchPlaceholder="Search patient name or number..."
             emptyMessage="No patients match your search."
             options={patientOptions.map((option) => ({
@@ -3059,8 +2685,16 @@ function Billing({ patient }: { patient: Patient | null }) {
             }))}
           />
         </label>
+        {selectedPatientId && (
+          <button
+            type="button"
+            className="classic-button"
+            onClick={() => setSelectedPatientId("")}
+          >
+            Show all
+          </button>
+        )}
       </div>
-      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
 
       <div className="billing-tab-strip tab-strip">
         <button
