@@ -1627,3 +1627,344 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     display: none;
   }
 }
+
+
+/* ============================================================
+   PR9 treatment planning, tasks, and recalls
+   ============================================================ */
+
+.treatment-plan-panel,
+.case-tasks-panel,
+.patient-recalls-panel {
+  min-height: 100%;
+}
+
+.plan-summary-grid {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  background: #eef3f8;
+  border-bottom: 1px solid #c5d0dc;
+}
+
+.plan-summary-grid > div {
+  min-height: 72px;
+  padding: 9px;
+  background: #fff;
+  border: 1px solid #d4dde6;
+}
+
+.plan-summary-grid span,
+.plan-summary-grid strong {
+  display: block;
+}
+
+.plan-summary-grid span {
+  color: #5b6d7f;
+  font-size: 11px;
+}
+
+.plan-summary-grid strong {
+  margin-top: 5px;
+  color: #174b7a;
+  font-size: 20px;
+}
+
+.plan-progress-track {
+  height: 8px;
+  margin-top: 9px;
+  overflow: hidden;
+  background: #dce4ec;
+  border-radius: 4px;
+}
+
+.plan-progress-track > span {
+  height: 100%;
+  display: block;
+  background: #2c7a4b;
+  border-radius: inherit;
+}
+
+.treatment-plan-list {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.treatment-plan-item {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #c5d0dc;
+  border-left: 4px solid #7794b0;
+}
+
+.treatment-plan-item.plan-accepted {
+  border-left-color: #286ca5;
+}
+
+.treatment-plan-item.plan-in_progress {
+  border-left-color: #d59b25;
+}
+
+.treatment-plan-item.plan-completed {
+  border-left-color: #4c9b67;
+  background: #f6fbf7;
+}
+
+.treatment-plan-item.plan-deferred {
+  border-left-color: #888f98;
+}
+
+.treatment-plan-item.plan-cancelled {
+  opacity: 0.62;
+}
+
+.plan-sequence {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8eff6;
+  color: #174b7a;
+  font-weight: 800;
+}
+
+.plan-item-main {
+  min-width: 0;
+}
+
+.plan-item-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plan-item-heading strong,
+.plan-item-heading span {
+  display: block;
+}
+
+.plan-item-heading > div > span {
+  margin-top: 3px;
+  color: #5b6d7f;
+}
+
+.plan-item-main p {
+  margin: 7px 0;
+  color: #4b5f72;
+}
+
+.plan-item-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.status-badge.plan-proposed {
+  background: #eef1f4;
+  color: #4e5f70;
+}
+
+.status-badge.plan-accepted {
+  background: #e8f1ff;
+  border-color: #8db8e7;
+  color: #174b7a;
+}
+
+.status-badge.plan-in_progress {
+  background: #fff1cf;
+  border-color: #d9ad43;
+  color: #704b00;
+}
+
+.status-badge.plan-completed {
+  background: #dff5e8;
+  border-color: #65a978;
+  color: #285b3b;
+}
+
+.status-badge.plan-deferred {
+  background: #f0f1f2;
+  color: #666;
+}
+
+.status-badge.plan-cancelled {
+  background: #f6e5e3;
+  color: #7d1a12;
+}
+
+.case-task-form,
+.recall-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.6fr) minmax(120px, .5fr) minmax(180px, .8fr);
+  gap: 8px;
+  padding: 10px;
+  background: #fff;
+  border-bottom: 1px solid #c5d0dc;
+}
+
+.case-task-form label,
+.recall-form label {
+  display: grid;
+  gap: 4px;
+  color: #405468;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.case-task-description,
+.recall-notes {
+  grid-column: 1 / -1;
+}
+
+.case-task-list,
+.recall-list {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+
+.case-task-card {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 9px;
+  padding: 9px 10px;
+  background: #fff;
+  border: 1px solid #c5d0dc;
+  border-left: 4px solid #8297aa;
+}
+
+.case-task-card.task-high {
+  border-left-color: #d49b24;
+}
+
+.case-task-card.task-urgent,
+.case-task-card.overdue {
+  border-left-color: #b42318;
+  background: #fff8f7;
+}
+
+.task-check button,
+.task-check span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef3f8;
+  border: 1px solid #aebdcb;
+  font-size: 17px;
+}
+
+.task-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.case-task-card p {
+  margin: 5px 0;
+  color: #4b5f72;
+}
+
+.case-task-card small {
+  color: #6b7c8d;
+}
+
+.case-recall-selector {
+  min-width: 130px;
+}
+
+.patient-recalls-panel {
+  background: #f7f9fb;
+}
+
+.recall-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 10px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #c5d0dc;
+  border-left: 4px solid #7794b0;
+}
+
+.recall-card.overdue {
+  border-left-color: #b42318;
+  background: #fff8f7;
+}
+
+.recall-card strong,
+.recall-card span,
+.recall-card small {
+  display: block;
+}
+
+.recall-card > div > span,
+.recall-card small {
+  margin-top: 3px;
+  color: #5d6f80;
+}
+
+.recall-card p {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: #4b5f72;
+}
+
+.status-badge.recall-open {
+  background: #fff1cf;
+  color: #704b00;
+}
+
+.status-badge.recall-scheduled {
+  background: #e8f1ff;
+  color: #174b7a;
+}
+
+.status-badge.recall-completed {
+  background: #dff5e8;
+  color: #285b3b;
+}
+
+.status-badge.recall-dismissed {
+  background: #eef1f4;
+  color: #596979;
+}
+
+@media (max-width: 900px) {
+  .plan-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-task-form,
+  .recall-form {
+    grid-template-columns: 1fr;
+  }
+
+  .case-task-description,
+  .recall-notes {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .plan-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .treatment-plan-item {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-sequence {
+    width: 26px;
+    height: 26px;
+  }
+}
