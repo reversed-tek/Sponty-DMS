@@ -1391,8 +1391,8 @@ function Appointments({
     setCheckInTarget(item);
     setCheckInCasesLoading(true);
     setCheckInDraft({
-      mode: "new",
-      existingCaseId: "",
+      mode: item.case_id ? "existing" : "new",
+      existingCaseId: item.case_id ?? "",
       caseTitle: item.reason ?? `${item.appointment_type} case`,
       intakeNotes: item.notes ?? "",
     });
@@ -1416,7 +1416,7 @@ function Appointments({
     } else {
       const options = (data ?? []) as ExistingCaseOption[];
       setActivePatientCases(options);
-      if (options.length) {
+      if (!item.case_id && options.length) {
         setCheckInDraft((current) => ({
           ...current,
           mode: "existing",
@@ -1817,6 +1817,7 @@ function Appointments({
                       Existing case
                       <select
                         value={checkInDraft.existingCaseId}
+                        disabled={Boolean(checkInTarget.case_id)}
                         onChange={(event) =>
                           setCheckInDraft((current) => ({
                             ...current,
@@ -1830,6 +1831,9 @@ function Appointments({
                           </option>
                         ))}
                       </select>
+                      {checkInTarget.case_id && (
+                        <small>This follow-up was linked to this Case when the appointment was booked.</small>
+                      )}
                     </label>
                   )}
 
