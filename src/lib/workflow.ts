@@ -26,10 +26,26 @@ export type WorkflowAppointment = {
   handed_over_at: string | null
   clinical_updated_at: string | null
   treatment_completed_at: string | null
+  case_id: string | null
 }
 
 export type TreatmentCompletionResult = {
   appointment_id: string
+  appointment_status: AppointmentWorkflowStatus
+  invoice_id: string
+  invoice_number: string
+  invoice_status: string
+  total: number
+  amount_paid: number
+  balance: number
+  treatment_count: number
+}
+
+export type CaseCompletionResult = {
+  case_id: string
+  case_number: string
+  case_status: 'open' | 'in_treatment' | 'awaiting_payment' | 'closed'
+  appointment_id: string | null
   appointment_status: AppointmentWorkflowStatus
   invoice_id: string
   invoice_number: string
@@ -116,8 +132,15 @@ function client() {
   return supabase
 }
 
-export async function checkInAppointment(appointmentId: string) {
-  const { data, error } = await client().rpc('check_in_appointment', { p_appointment_id: appointmentId })
+export async function checkInAppointment(
+  appointmentId: string,
+  intake?: { caseTitle?: string; intakeNotes?: string },
+) {
+  const { data, error } = await client().rpc('check_in_appointment', {
+    p_appointment_id: appointmentId,
+    p_case_title: intake?.caseTitle?.trim() || null,
+    p_intake_notes: intake?.intakeNotes?.trim() || null,
+  })
   if (error) throw new Error(error.message)
   return data as WorkflowAppointment
 }
@@ -144,6 +167,14 @@ export async function completeTreatmentWorkflow(appointmentId: string) {
   const { data, error } = await client().rpc('complete_treatment_workflow', { p_appointment_id: appointmentId })
   if (error) throw new Error(error.message)
   return data as TreatmentCompletionResult
+}
+
+export async function completeCaseWorkflow(caseId: string) {
+  const { data, error } = await client().rpc('complete_case_workflow', {
+    p_case_id: caseId,
+  })
+  if (error) throw new Error(error.message)
+  return data as CaseCompletionResult
 }
 
 export async function recordInvoicePayment(invoiceId: string, amount: number, paymentMethod?: string) {
