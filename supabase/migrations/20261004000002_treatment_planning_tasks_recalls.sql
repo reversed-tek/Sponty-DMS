@@ -916,7 +916,7 @@ begin
   into remaining_plan_items
   from public.treatment_plan_items
   where case_id = p_case_id
-    and status in ('proposed', 'accepted', 'in_progress', 'deferred');
+    and status in ('proposed', 'accepted', 'in_progress');
 
   next_case_status :=
     case
@@ -1075,7 +1075,7 @@ begin
   into active_plan_items
   from public.treatment_plan_items
   where case_id = p_case_id
-    and status in ('proposed', 'accepted', 'in_progress', 'deferred');
+    and status in ('proposed', 'accepted', 'in_progress');
 
   if active_plan_items > 0 then
     raise exception 'case_has_incomplete_treatment_plan';
