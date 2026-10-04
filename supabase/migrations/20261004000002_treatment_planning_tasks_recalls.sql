@@ -123,6 +123,7 @@ set search_path = public
 as $$
 declare
   task_row public.case_tasks;
+  existing_task_id uuid;
 begin
   if p_case_id is null then
     raise exception 'case_id_required';
@@ -137,8 +138,8 @@ begin
   end if;
 
   if p_dedupe_key is not null then
-    select *
-    into task_row
+    select id
+    into existing_task_id
     from public.case_tasks
     where case_id = p_case_id
       and dedupe_key = p_dedupe_key
@@ -147,7 +148,7 @@ begin
     for update;
   end if;
 
-  if task_row.id is not null then
+  if existing_task_id is not null then
     update public.case_tasks
     set
       task_type = p_task_type,
@@ -157,7 +158,7 @@ begin
       due_at = p_due_at,
       appointment_id = coalesce(p_appointment_id, appointment_id),
       updated_at = now()
-    where id = task_row.id
+    where id = existing_task_id
     returning * into task_row;
 
     return task_row;
@@ -343,7 +344,7 @@ begin
   if recall_row.id is not null then
     update public.patient_recalls
     set
-      due_date = current_date + make_interval(months => p_interval_months),
+      due_date = (current_date + make_interval(months => p_interval_months))::date,
       interval_months = p_interval_months,
       notes = coalesce(p_notes, notes),
       status = 'open',
@@ -370,7 +371,7 @@ begin
     p_patient_id,
     p_case_id,
     p_recall_type,
-    current_date + make_interval(months => p_interval_months),
+    (current_date + make_interval(months => p_interval_months))::date,
     p_interval_months,
     'open',
     p_source,
@@ -416,55 +417,56 @@ begin
     return new;
   end if;
 
-  if tg_op = 'INSERT'
-     and new.status not in ('cancelled', 'no_show') then
+  if tg_op = 'INSERT' then
+    if new.status not in ('cancelled', 'no_show') then
 
-    -- Follow-up recalls can be satisfied by the next booked visit.
-    select *
-    into recall_row
-    from public.patient_recalls
-    where patient_id = new.patient_id
-      and recall_type = 'follow_up'
-      and status = 'open'
-    order by due_date
-    limit 1
-    for update;
-
-    -- Preventive recalls should only attach to checkup/cleaning appointments.
-    if recall_row.id is null
-       and new.appointment_type in ('checkup', 'cleaning') then
+      -- Follow-up recalls can be satisfied by the next booked visit.
       select *
       into recall_row
       from public.patient_recalls
       where patient_id = new.patient_id
-        and recall_type = 'preventive'
+        and recall_type = 'follow_up'
         and status = 'open'
       order by due_date
       limit 1
       for update;
+
+      -- Preventive recalls should only attach to checkup/cleaning appointments.
+      if recall_row.id is null
+         and new.appointment_type in ('checkup', 'cleaning') then
+        select *
+        into recall_row
+        from public.patient_recalls
+        where patient_id = new.patient_id
+          and recall_type = 'preventive'
+          and status = 'open'
+        order by due_date
+        limit 1
+        for update;
+      end if;
+
+      if recall_row.id is not null then
+        update public.patient_recalls
+        set
+          status = 'scheduled',
+          related_appointment_id = new.id,
+          updated_at = now()
+        where id = recall_row.id;
+      end if;
     end if;
 
-    if recall_row.id is not null then
+  elsif tg_op = 'UPDATE' then
+    if new.status = 'completed'
+       and old.status is distinct from new.status then
+
       update public.patient_recalls
       set
-        status = 'scheduled',
-        related_appointment_id = new.id,
+        status = 'completed',
+        completed_at = now(),
         updated_at = now()
-      where id = recall_row.id;
+      where related_appointment_id = new.id
+        and status = 'scheduled';
     end if;
-  end if;
-
-  if tg_op = 'UPDATE'
-     and new.status = 'completed'
-     and old.status is distinct from new.status then
-
-    update public.patient_recalls
-    set
-      status = 'completed',
-      completed_at = now(),
-      updated_at = now()
-    where related_appointment_id = new.id
-      and status = 'scheduled';
   end if;
 
   return new;
