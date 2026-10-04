@@ -262,6 +262,7 @@ export async function schedulePatientRecall(input: {
     p_interval_months: input.intervalMonths,
     p_recall_type: input.recallType ?? "preventive",
     p_notes: input.notes?.trim() || null,
+    p_source: "manual",
   });
 
   if (error) throw new Error(error.message);
