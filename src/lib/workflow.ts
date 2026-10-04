@@ -134,12 +134,19 @@ function client() {
 
 export async function checkInAppointment(
   appointmentId: string,
-  intake?: { caseTitle?: string; intakeNotes?: string },
+  intake?: {
+    caseTitle?: string
+    intakeNotes?: string
+    existingCaseId?: string | null
+    createNewCase?: boolean
+  },
 ) {
   const { data, error } = await client().rpc('check_in_appointment', {
     p_appointment_id: appointmentId,
     p_case_title: intake?.caseTitle?.trim() || null,
     p_intake_notes: intake?.intakeNotes?.trim() || null,
+    p_existing_case_id: intake?.existingCaseId || null,
+    p_create_new_case: intake?.createNewCase ?? true,
   })
   if (error) throw new Error(error.message)
   return data as WorkflowAppointment

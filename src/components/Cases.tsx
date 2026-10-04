@@ -96,7 +96,15 @@ const statusLabel = (status: CaseStatus) =>
         ? "Closed"
         : "Open";
 
-export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
+export function Cases({
+  setNotice,
+  initialCaseId = null,
+  onInitialCaseHandled,
+}: {
+  setNotice: (message: string) => void;
+  initialCaseId?: string | null;
+  onInitialCaseHandled?: () => void;
+}) {
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseView, setCaseView] = useState<"active" | "closed">("active");
@@ -180,11 +188,9 @@ export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
     });
 
     setCases(mapped);
-    setSelectedCaseId((current) => {
-      if (current && mapped.some((item) => item.id === current)) return current;
-      const firstActive = mapped.find((item) => item.status !== "closed");
-      return firstActive?.id ?? mapped[0]?.id ?? null;
-    });
+    setSelectedCaseId((current) =>
+      current && mapped.some((item) => item.id === current) ? current : null,
+    );
     setError("");
     setLoading(false);
   }, []);
@@ -299,6 +305,14 @@ export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
       void client.removeChannel(channel);
     };
   }, [loadCases]);
+
+  useEffect(() => {
+    if (!initialCaseId || !cases.some((item) => item.id === initialCaseId)) return;
+
+    setSelectedCaseId(initialCaseId);
+    setTab("overview");
+    onInitialCaseHandled?.();
+  }, [cases, initialCaseId, onInitialCaseHandled]);
 
   const selectedCase = cases.find((item) => item.id === selectedCaseId) ?? null;
   const visibleCases = cases.filter((item) =>
@@ -502,7 +516,7 @@ export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
   }
 
   return (
-    <div className="cases-layout">
+    <div className="cases-module">
       <section className="panel cases-queue">
         <div className="panel-title">Case Queue</div>
         <div className="tab-strip">
@@ -559,20 +573,25 @@ export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
         )}
       </section>
 
-      <section className="panel case-workspace">
-        {!selectedCase ? (
-          <div className="empty-state">
-            Cases are created when reception checks a patient in.
-          </div>
-        ) : (
-          <>
-            <div className="panel-title">
+      {selectedCase && (
+        <div className="modal-backdrop case-modal-backdrop">
+          <section className="classic-dialog case-workspace-dialog" role="dialog" aria-modal="true">
+            <div className="dialog-title case-dialog-title">
               <span>
                 {selectedCase.case_number} · {selectedCase.patient_name}
               </span>
-              <span className={`status-badge case-${selectedCase.status}`}>
-                {statusLabel(selectedCase.status)}
-              </span>
+              <div className="case-dialog-title-actions">
+                <span className={`status-badge case-${selectedCase.status}`}>
+                  {statusLabel(selectedCase.status)}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Close case"
+                  onClick={() => setSelectedCaseId(null)}
+                >
+                  X
+                </button>
+              </div>
             </div>
 
             <div className="case-header">
@@ -815,9 +834,9 @@ export function Cases({ setNotice }: { setNotice: (message: string) => void }) {
                 )}
               </div>
             )}
-          </>
-        )}
-      </section>
+          </section>
+        </div>
+      )}
 
       {showClinicalForm && selectedCase && (
         <div className="modal-backdrop">

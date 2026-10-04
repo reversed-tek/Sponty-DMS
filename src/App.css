@@ -613,3 +613,111 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Case popup + reception case chooser */
+.cases-module {
+  min-width: 0;
+}
+
+.cases-module .cases-queue {
+  width: 100%;
+}
+
+.cases-module .case-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px;
+  max-height: none;
+}
+
+.case-modal-backdrop {
+  z-index: 3;
+}
+
+.case-workspace-dialog {
+  width: min(1120px, 96vw);
+  height: min(88vh, 900px);
+  display: flex;
+  flex-direction: column;
+}
+
+.case-dialog-title {
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.case-dialog-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.case-dialog-title-actions .status-badge {
+  color: #111;
+}
+
+.case-workspace-dialog .case-header,
+.case-workspace-dialog .case-tabs {
+  flex: 0 0 auto;
+}
+
+.case-workspace-dialog .case-tab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.check-in-case-dialog {
+  width: min(560px, 96vw);
+}
+
+.case-choice-list {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.case-choice-option {
+  display: grid !important;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #808080;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
+}
+
+.case-choice-option input {
+  width: auto !important;
+  min-height: auto;
+  margin-top: 2px;
+}
+
+.case-choice-option strong,
+.case-choice-option small {
+  display: block;
+}
+
+.case-choice-option small {
+  margin-top: 3px;
+  color: #404040;
+}
+
+@media (max-width: 700px) {
+  .cases-module .case-list {
+    grid-template-columns: 1fr;
+  }
+
+  .case-workspace-dialog {
+    width: 98vw;
+    height: 92vh;
+  }
+
+  .case-tabs {
+    overflow-x: auto;
+  }
+}

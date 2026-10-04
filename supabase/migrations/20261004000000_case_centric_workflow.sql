@@ -140,13 +140,17 @@ where i.case_id is null
   and i.appointment_id = a.id
   and a.case_id is not null;
 
--- Check-in is now the point where a Case is created (or the patient's current
--- open Case is reused for a follow-up appointment). Intake details are stored
--- on the appointment and seed the Case.
+-- Check-in is now the point where reception explicitly chooses whether to
+-- create a new Case or attach the appointment to an existing active Case.
+drop function if exists public.check_in_appointment(uuid);
+drop function if exists public.check_in_appointment(uuid, text, text);
+
 create or replace function public.check_in_appointment(
   p_appointment_id uuid,
   p_case_title text default null,
-  p_intake_notes text default null
+  p_intake_notes text default null,
+  p_existing_case_id uuid default null,
+  p_create_new_case boolean default true
 )
 returns public.appointments
 language plpgsql
@@ -191,48 +195,57 @@ begin
   returning * into appointment_row;
 
   if appointment_row.case_id is not null then
-    select * into case_row
-    from public.cases
-    where id = appointment_row.case_id
-    for update;
-  else
     select *
     into case_row
     from public.cases
-    where patient_id = appointment_row.patient_id
+    where id = appointment_row.case_id
+    for update;
+
+  elsif p_existing_case_id is not null then
+    select *
+    into case_row
+    from public.cases
+    where id = p_existing_case_id
+      and patient_id = appointment_row.patient_id
       and status in ('open', 'in_treatment', 'awaiting_payment')
-    order by updated_at desc
-    limit 1
     for update;
 
     if not found then
-      insert into public.cases (
-        patient_id,
-        primary_appointment_id,
-        assigned_provider_id,
-        title,
-        intake_notes,
-        status,
-        created_by
-      )
-      values (
-        appointment_row.patient_id,
-        appointment_row.id,
-        appointment_row.provider_id,
-        coalesce(
-          nullif(trim(p_case_title), ''),
-          nullif(trim(appointment_row.reason), ''),
-          initcap(replace(appointment_row.appointment_type, '_', ' ')) || ' case'
-        ),
-        coalesce(nullif(trim(p_intake_notes), ''), appointment_row.notes),
-        'open',
-        auth.uid()
-      )
-      returning * into case_row;
-
-      created_case := true;
+      raise exception 'selected_case_not_found_or_not_active';
     end if;
 
+  elsif p_create_new_case then
+    insert into public.cases (
+      patient_id,
+      primary_appointment_id,
+      assigned_provider_id,
+      title,
+      intake_notes,
+      status,
+      created_by
+    )
+    values (
+      appointment_row.patient_id,
+      appointment_row.id,
+      appointment_row.provider_id,
+      coalesce(
+        nullif(trim(p_case_title), ''),
+        nullif(trim(appointment_row.reason), ''),
+        initcap(replace(appointment_row.appointment_type, '_', ' ')) || ' case'
+      ),
+      coalesce(nullif(trim(p_intake_notes), ''), appointment_row.notes),
+      'open',
+      auth.uid()
+    )
+    returning * into case_row;
+
+    created_case := true;
+
+  else
+    raise exception 'case_selection_required';
+  end if;
+
+  if appointment_row.case_id is null then
     update public.appointments
     set case_id = case_row.id
     where id = p_appointment_id
@@ -284,7 +297,8 @@ begin
     jsonb_build_object(
       'patient_id', appointment_row.patient_id,
       'case_id', case_row.id,
-      'case_number', case_row.case_number
+      'case_number', case_row.case_number,
+      'case_created', created_case
     )
   );
 
@@ -292,8 +306,8 @@ begin
 end;
 $$;
 
-revoke all on function public.check_in_appointment(uuid, text, text) from public;
-grant execute on function public.check_in_appointment(uuid, text, text) to authenticated;
+revoke all on function public.check_in_appointment(uuid, text, text, uuid, boolean) from public;
+grant execute on function public.check_in_appointment(uuid, text, text, uuid, boolean) to authenticated;
 
 -- Handover now assigns the Case to the appointment's dentist.
 create or replace function public.handover_appointment_to_dentist(p_appointment_id uuid)
