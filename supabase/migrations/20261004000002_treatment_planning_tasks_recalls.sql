@@ -306,7 +306,8 @@ create or replace function public.schedule_patient_recall(
   p_case_id uuid default null,
   p_interval_months integer default 6,
   p_recall_type text default 'preventive',
-  p_notes text default null
+  p_notes text default null,
+  p_source text default 'automated'
 )
 returns public.patient_recalls
 language plpgsql
@@ -322,6 +323,10 @@ begin
 
   if p_recall_type not in ('preventive', 'follow_up') then
     raise exception 'invalid_recall_type';
+  end if;
+
+  if p_source not in ('manual', 'automated') then
+    raise exception 'invalid_recall_source';
   end if;
 
   if p_case_id is not null then
@@ -368,7 +373,7 @@ begin
     current_date + make_interval(months => p_interval_months),
     p_interval_months,
     'open',
-    'automated',
+    p_source,
     p_notes,
     auth.uid()
   )
@@ -394,8 +399,8 @@ begin
 end;
 $$;
 
-revoke all on function public.schedule_patient_recall(uuid, uuid, integer, text, text) from public;
-grant execute on function public.schedule_patient_recall(uuid, uuid, integer, text, text) to authenticated;
+revoke all on function public.schedule_patient_recall(uuid, uuid, integer, text, text, text) from public;
+grant execute on function public.schedule_patient_recall(uuid, uuid, integer, text, text, text) to authenticated;
 
 -- A checkup/cleaning appointment satisfies an open preventive recall.
 create or replace function public.sync_recall_from_appointment()
@@ -412,18 +417,32 @@ begin
   end if;
 
   if tg_op = 'INSERT'
-     and new.appointment_type in ('checkup', 'cleaning')
      and new.status not in ('cancelled', 'no_show') then
 
+    -- Follow-up recalls can be satisfied by the next booked visit.
     select *
     into recall_row
     from public.patient_recalls
     where patient_id = new.patient_id
-      and recall_type = 'preventive'
+      and recall_type = 'follow_up'
       and status = 'open'
     order by due_date
     limit 1
     for update;
+
+    -- Preventive recalls should only attach to checkup/cleaning appointments.
+    if recall_row.id is null
+       and new.appointment_type in ('checkup', 'cleaning') then
+      select *
+      into recall_row
+      from public.patient_recalls
+      where patient_id = new.patient_id
+        and recall_type = 'preventive'
+        and status = 'open'
+      order by due_date
+      limit 1
+      for update;
+    end if;
 
     if recall_row.id is not null then
       update public.patient_recalls
@@ -1103,7 +1122,8 @@ begin
       p_case_id,
       p_recall_months,
       'preventive',
-      'Automatically created when ' || case_row.case_number || ' was closed.'
+      'Automatically created when ' || case_row.case_number || ' was closed.',
+      'automated'
     );
   end if;
 
