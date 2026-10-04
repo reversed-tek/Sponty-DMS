@@ -69,7 +69,7 @@ export function Dashboard({
         .select(
           "id, patient_id, recall_type, due_date, status, patients(first_name, last_name)",
         )
-        .in("status", ["open", "scheduled"])
+        .eq("status", "open")
         .lte("due_date", recallWindowDate)
         .order("due_date"),
     ])
