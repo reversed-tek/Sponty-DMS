@@ -675,7 +675,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $case_inherit$
 begin
   if new.case_id is null and new.appointment_id is not null then
     select a.case_id
@@ -686,7 +686,7 @@ begin
 
   return new;
 end;
-$;
+$case_inherit$;
 
 drop trigger if exists clinical_notes_inherit_case on public.clinical_notes;
 create trigger clinical_notes_inherit_case
