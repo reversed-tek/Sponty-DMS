@@ -1354,7 +1354,7 @@ function Appointments({
       .from("cases")
       .select("id, case_number, title, status, updated_at")
       .eq("patient_id", item.patient_id)
-      .in("status", ["open", "in_treatment", "awaiting_payment"])
+      .in("status", ["open", "in_treatment", "treatment_complete"])
       .order("updated_at", { ascending: false });
 
     if (caseError) {
