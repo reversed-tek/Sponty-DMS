@@ -44,7 +44,8 @@ export type TreatmentCompletionResult = {
 export type CaseCompletionResult = {
   case_id: string
   case_number: string
-  case_status: 'open' | 'in_treatment' | 'awaiting_payment' | 'closed'
+  case_status: 'open' | 'in_treatment' | 'treatment_complete' | 'closed'
+  billing_status: 'not_billed' | 'pending' | 'partial' | 'paid'
   appointment_id: string | null
   appointment_status: AppointmentWorkflowStatus
   invoice_id: string
@@ -64,7 +65,8 @@ export type PaymentResult = {
   balance: number
   applied_amount?: number
   appointment_id: string | null
-  appointment_completed: boolean
+  case_id: string | null
+  case_billing_status: 'not_billed' | 'pending' | 'partial' | 'paid' | null
 }
 
 export type ProviderDirectoryEntry = {

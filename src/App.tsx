@@ -3,7 +3,6 @@ import "./App.css";
 import { issuePatientPortalAccess, signInWithMicrosoft, signOut, supabase } from "./lib/supabase";
 import {
   checkInAppointment,
-  completeTreatmentWorkflow,
   deleteAppointment,
   getPatientVisitHistory,
   handoverAppointmentToDentist,
@@ -20,18 +19,19 @@ import { WaitlistClaimWindow } from "./components/WaitlistClaimWindow";
 import { PatientPortal } from "./components/PatientPortal";
 import { SearchableSelect } from "./components/SearchableSelect";
 import { Cases } from "./components/Cases";
+import { Dashboard } from "./components/Dashboard";
+import { AppointmentProgress } from "./components/AppointmentProgress";
 
 type Page =
   | "Dashboard"
   | "Patients"
   | "Appointments"
   | "Cases"
-  | "Treatments"
   | "Billing"
   | "Reports"
   | "User Settings"
   | "Practice Settings";
-type CaseTab = "chart" | "history" | null;
+type CaseTab = "cases" | "chart" | "history" | null;
 type Patient = {
   id: string;
   patient_number: string;
@@ -95,13 +95,6 @@ const toothNumbers = [
 const queryError = (error: { message: string } | null) => error?.message ?? "";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
-const formatWorkflowTime = (value: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-PH", {
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date(value))
-    : "";
 const roleLabel = (role: string) =>
   role === "admin"
     ? "System Administrator"
@@ -266,23 +259,6 @@ function App() {
     }
   }
 
-  async function completeTreatmentForAppointment(appointmentId: string): Promise<boolean> {
-    try {
-      const result = await completeTreatmentWorkflow(appointmentId);
-      setNotice(
-        result.appointment_status === "completed"
-          ? `Treatment completed. Invoice ${result.invoice_number} is paid and the appointment is complete.`
-          : `Treatment completed. Invoice ${result.invoice_number} is ready in Billing for payment.`,
-      );
-      return true;
-    } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "Complete treatment failed.";
-      setNotice("Treatment completion failed");
-      setError(message);
-      return false;
-    }
-  }
-
   return (
     <div className="app-window">
       <header className="title-bar">
@@ -351,8 +327,10 @@ function App() {
               selected={selectedPatient}
               setSelected={setSelectedPatient}
               setNotice={setNotice}
-              onHandoverToDentist={handoverToDentist}
-              onCompleteTreatment={completeTreatmentForAppointment}
+              onOpenCase={(caseId) => {
+                setRequestedCaseId(caseId);
+                navigate("Cases");
+              }}
             />
           )}
           {page === "Appointments" && (
@@ -374,9 +352,6 @@ function App() {
               onInitialCaseHandled={() => setRequestedCaseId(null)}
             />
           )}
-          {page === "Treatments" && (
-            <Treatments patient={selectedPatient} setNotice={setNotice} />
-          )}
           {page === "Billing" && <Billing patient={selectedPatient} />}
           {page === "Reports" && <Reports />}
           {page === "User Settings" && <UserManagement />}
@@ -390,114 +365,18 @@ function App() {
   );
 }
 
-function Dashboard({ navigate }: { navigate: (page: Page) => void }) {
-  const [counts, setCounts] = useState({
-    patients: 0,
-    appointments: 0,
-    invoices: 0,
-  });
-  useEffect(() => {
-    if (!supabase) return;
-    Promise.all([
-      supabase
-        .from("patients")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true),
-      supabase
-        .from("appointments")
-        .select("id", { count: "exact", head: true })
-        .eq("appointment_date", new Date().toISOString().slice(0, 10)),
-      supabase
-        .from("invoices")
-        .select("id", { count: "exact", head: true })
-        .gt("balance", 0),
-    ]).then(([patients, appointments, invoices]) =>
-      setCounts({
-        patients: patients.count ?? 0,
-        appointments: appointments.count ?? 0,
-        invoices: invoices.count ?? 0,
-      }),
-    );
-  }, []);
-  return (
-    <div className="dashboard-grid">
-      <section className="panel stat-panel">
-        <div className="panel-title">Today's Overview</div>
-        <div className="stat-row">
-          <div>
-            <b>{counts.appointments}</b>
-            <span>Appointments today</span>
-          </div>
-          <div>
-            <b>{counts.patients}</b>
-            <span>Active patients</span>
-          </div>
-          <div>
-            <b>{counts.invoices}</b>
-            <span>Outstanding invoices</span>
-          </div>
-        </div>
-      </section>
-      <section className="panel alert-panel">
-        <div className="panel-title">Database Status</div>
-        <p className="notice info">Live counts are loaded from Supabase.</p>
-        <p className="notice warning">
-          Review active patient alerts before treatment.
-        </p>
-      </section>
-      <section className="panel quick-panel">
-        <div className="panel-title">Quick Actions</div>
-        <button
-          type="button"
-          className="action-row"
-          onClick={() => navigate("Patients")}
-        >
-          <strong>Open patients</strong>
-          <small>Search the live patient register</small>
-        </button>
-        <button
-          type="button"
-          className="action-row"
-          onClick={() => navigate("Appointments")}
-        >
-          <strong>Open appointments</strong>
-          <small>Review the live schedule</small>
-        </button>
-        <button
-          type="button"
-          className="action-row"
-          onClick={() => navigate("Cases")}
-        >
-          <strong>Open cases</strong>
-          <small>Work from the active patient case queue</small>
-        </button>
-        <button
-          type="button"
-          className="action-row"
-          onClick={() => navigate("Billing")}
-        >
-          <strong>Open billing</strong>
-          <small>Review outstanding invoices</small>
-        </button>
-      </section>
-    </div>
-  );
-}
-
 function Patients({
   search,
   selected,
   setSelected,
   setNotice,
-  onHandoverToDentist,
-  onCompleteTreatment,
+  onOpenCase,
 }: {
   search: string;
   selected: Patient | null;
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
-  onHandoverToDentist: (appointmentId: string) => void;
-  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
+  onOpenCase: (caseId: string) => void;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -525,16 +404,13 @@ function Patients({
     reason: string | null;
     notes: string | null;
     provider_name: string | null;
+    case_id: string | null;
   } | null>(null);
   const [caseTab, setCaseTab] = useState<CaseTab>(null);
   useEffect(() => {
-    setCaseTab(null);
+    setCaseTab(selected ? "cases" : null);
   }, [selected?.id]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [appointmentSessionId, setAppointmentSessionId] = useState<string | null>(null);
-  const [appointmentSessionDraft, setAppointmentSessionDraft] = useState({ reason: "", notes: "" });
-  const [appointmentTreatmentDraft, setAppointmentTreatmentDraft] = useState({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
-  const [appointmentNoteDraft, setAppointmentNoteDraft] = useState({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -577,7 +453,7 @@ function Patients({
       supabase
         .from("appointments")
         .select(
-          "id, provider_id, appointment_date, appointment_time, appointment_type, status, reason, notes",
+          "id, provider_id, case_id, appointment_date, appointment_time, appointment_type, status, reason, notes",
         )
         .eq("patient_id", selected.id)
         .order("appointment_date", { ascending: true })
@@ -614,6 +490,7 @@ function Patients({
         reason: next.reason,
         notes: next.notes,
         provider_name: provider?.full_name ?? null,
+        case_id: next.case_id ?? null,
       });
     }).catch(() => setUpcomingAppointment(null));
   }, [selected]);
@@ -1015,6 +892,11 @@ function Patients({
                   </span>
                 </div>
               </div>
+              {selected.allergies && (
+                <div className="medical-alert patient-record-alert">
+                  <strong>Patient alert:</strong> {selected.allergies}
+                </div>
+              )}
               {upcomingAppointment && (
                 <div className="appointment-detail-card">
                   <div>
@@ -1031,19 +913,17 @@ function Patients({
                     <span className="status-badge">
                       {appointmentStatusLabel(upcomingAppointment.status)}
                     </span>
-                    <button
-                      type="button"
-                      className="classic-button primary"
-                      onClick={() => {
-                        setAppointmentSessionId(upcomingAppointment.id);
-                        setAppointmentSessionDraft({
-                          reason: upcomingAppointment.reason ?? "",
-                          notes: upcomingAppointment.notes ?? "",
-                        });
-                      }}
-                    >
-                      Open appointment
-                    </button>
+                    {upcomingAppointment.case_id ? (
+                      <button
+                        type="button"
+                        className="classic-button primary"
+                        onClick={() => onOpenCase(upcomingAppointment.case_id!)}
+                      >
+                        Open Case
+                      </button>
+                    ) : (
+                      <span className="record-chip">Case created at check-in</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1069,287 +949,9 @@ function Patients({
               patient={selected}
               caseTab={caseTab}
               setCaseTab={setCaseTab}
-              onCompleteTreatment={onCompleteTreatment}
-              upcomingAppointment={upcomingAppointment}
+              onOpenCase={onOpenCase}
               setNotice={setNotice}
             />
-
-            {appointmentSessionId && upcomingAppointment && (
-              <div className="modal-backdrop">
-                <section className="classic-dialog" role="dialog" aria-modal="true">
-                  <div className="dialog-title">
-                    {selected.first_name} {selected.last_name}
-                    <button type="button" onClick={() => setAppointmentSessionId(null)}>
-                      X
-                    </button>
-                  </div>
-                  <div className="dialog-body appointment-detail-body">
-                    <div className="appointment-detail-meta">
-                      <span>{upcomingAppointment.appointment_date}</span>
-                      <span>{upcomingAppointment.appointment_time}</span>
-                      <span>{upcomingAppointment.appointment_type}</span>
-                    </div>
-
-                    <div className="appointment-session-panel">
-                      <h3>Dentist session</h3>
-                      <div className="appointment-session-actions">
-                        <button
-                          type="button"
-                          className="classic-button primary"
-                          onClick={async () => {
-                            const completed = await onCompleteTreatment(upcomingAppointment.id);
-                            if (completed) {
-                              setAppointmentSessionId(null);
-                            }
-                          }}
-                          disabled={upcomingAppointment.status !== "in_progress"}
-                        >
-                          Complete treatment
-                        </button>
-                        <button
-                          type="button"
-                          className="classic-button"
-                          onClick={() => onHandoverToDentist(upcomingAppointment.id)}
-                          disabled={upcomingAppointment.status !== "confirmed"}
-                        >
-                          Handover to dentist
-                        </button>
-                      </div>
-                    </div>
-
-                    <label>
-                      Chief complaint
-                      <input
-                        value={appointmentSessionDraft.reason}
-                        onChange={(event) =>
-                          setAppointmentSessionDraft((current) => ({ ...current, reason: event.target.value }))
-                        }
-                        placeholder="e.g. Tooth pain on upper right molar"
-                      />
-                    </label>
-                    <label>
-                      Assistant notes
-                      <textarea
-                        value={appointmentSessionDraft.notes}
-                        onChange={(event) =>
-                          setAppointmentSessionDraft((current) => ({ ...current, notes: event.target.value }))
-                        }
-                        placeholder="Add treatment notes or clinical observations"
-                      />
-                    </label>
-
-                    <div className="appointment-session-panel">
-                      <h3>Add treatment</h3>
-                      <div className="appointment-session-grid">
-                        <label>
-                          Procedure name
-                          <input
-                            value={appointmentTreatmentDraft.procedureName}
-                            onChange={(event) =>
-                              setAppointmentTreatmentDraft((current) => ({ ...current, procedureName: event.target.value }))
-                            }
-                            placeholder="e.g. Composite filling"
-                          />
-                        </label>
-                        <label>
-                          Tooth number
-                          <input
-                            type="number"
-                            min="11"
-                            max="48"
-                            value={appointmentTreatmentDraft.toothNumber}
-                            onChange={(event) =>
-                              setAppointmentTreatmentDraft((current) => ({ ...current, toothNumber: event.target.value }))
-                            }
-                            placeholder="18"
-                          />
-                        </label>
-                        <label>
-                          Cost
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={appointmentTreatmentDraft.cost}
-                            onChange={(event) =>
-                              setAppointmentTreatmentDraft((current) => ({ ...current, cost: event.target.value }))
-                            }
-                          />
-                        </label>
-                      </div>
-                      <label>
-                        Treatment notes
-                        <textarea
-                          value={appointmentTreatmentDraft.notes}
-                          onChange={(event) =>
-                            setAppointmentTreatmentDraft((current) => ({ ...current, notes: event.target.value }))
-                          }
-                          placeholder="Describe the procedure or treatment plan"
-                        />
-                      </label>
-                      <div className="dialog-actions">
-                        <button
-                          type="button"
-                          className="classic-button primary"
-                          onClick={async () => {
-                            if (!supabase || !appointmentSessionId) return;
-                            const procedureName = appointmentTreatmentDraft.procedureName.trim();
-                            if (!procedureName) {
-                              setNotice("Add a procedure name before saving the treatment.");
-                              return;
-                            }
-                            const { data: auth } = await supabase.auth.getUser();
-                            if (!auth.user) {
-                              setNotice("Your session is not available.");
-                              return;
-                            }
-                            const { error } = await supabase.from("treatments").insert({
-                              patient_id: selected.id,
-                              appointment_id: appointmentSessionId,
-                              provider_id: auth.user.id,
-                              treatment_date: upcomingAppointment.appointment_date,
-                              tooth_number: appointmentTreatmentDraft.toothNumber ? Number(appointmentTreatmentDraft.toothNumber) : null,
-                              procedure_name: procedureName,
-                              description: appointmentTreatmentDraft.notes.trim() || null,
-                              cost: Number(appointmentTreatmentDraft.cost || 0),
-                              notes: appointmentTreatmentDraft.notes.trim() || null,
-                              status: "planned",
-                              created_by: auth.user.id,
-                            });
-                            if (error) {
-                              setNotice(error.message);
-                              return;
-                            }
-                            setAppointmentTreatmentDraft({ procedureName: "", toothNumber: "", cost: "0", notes: "" });
-                            setNotice("Treatment added to the appointment.");
-                          }}
-                        >
-                          Save treatment
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="appointment-session-panel">
-                      <h3>Clinical note</h3>
-                      <div className="appointment-session-grid">
-                        <label>
-                          Visit type
-                          <select
-                            value={appointmentNoteDraft.visitType}
-                            onChange={(event) =>
-                              setAppointmentNoteDraft((current) => ({ ...current, visitType: event.target.value }))
-                            }
-                          >
-                            <option value="consultation">Consultation</option>
-                            <option value="follow_up">Follow up</option>
-                            <option value="initial">Initial</option>
-                            <option value="emergency">Emergency</option>
-                          </select>
-                        </label>
-                      </div>
-                      <label>
-                        Subjective
-                        <textarea
-                          value={appointmentNoteDraft.subjective}
-                          onChange={(event) =>
-                            setAppointmentNoteDraft((current) => ({ ...current, subjective: event.target.value }))
-                          }
-                          placeholder="Symptoms described by the patient"
-                        />
-                      </label>
-                      <label>
-                        Assessment
-                        <textarea
-                          value={appointmentNoteDraft.assessment}
-                          onChange={(event) =>
-                            setAppointmentNoteDraft((current) => ({ ...current, assessment: event.target.value }))
-                          }
-                          placeholder="Dentist assessment"
-                        />
-                      </label>
-                      <label>
-                        Plan
-                        <textarea
-                          value={appointmentNoteDraft.plan}
-                          onChange={(event) =>
-                            setAppointmentNoteDraft((current) => ({ ...current, plan: event.target.value }))
-                          }
-                          placeholder="Treatment or follow-up plan"
-                        />
-                      </label>
-                      <div className="dialog-actions">
-                        <button
-                          type="button"
-                          className="classic-button primary"
-                          onClick={async () => {
-                            if (!supabase || !appointmentSessionId) return;
-                            const subjective = appointmentNoteDraft.subjective.trim();
-                            const assessment = appointmentNoteDraft.assessment.trim();
-                            const plan = appointmentNoteDraft.plan.trim();
-                            if (!subjective && !assessment && !plan) {
-                              setNotice("Add at least one clinical note detail before saving.");
-                              return;
-                            }
-                            const { data: auth } = await supabase.auth.getUser();
-                            if (!auth.user) {
-                              setNotice("Your session is not available.");
-                              return;
-                            }
-                            const { error } = await supabase.from("clinical_notes").insert({
-                              patient_id: selected.id,
-                              appointment_id: appointmentSessionId,
-                              author_id: auth.user.id,
-                              visit_type: appointmentNoteDraft.visitType,
-                              note_date: upcomingAppointment.appointment_date,
-                              subjective: subjective || null,
-                              assessment: assessment || null,
-                              plan: plan || null,
-                              is_private: false,
-                            });
-                            if (error) {
-                              setNotice(error.message);
-                              return;
-                            }
-                            setAppointmentNoteDraft({ visitType: "consultation", subjective: "", assessment: "", plan: "" });
-                            setNotice("Clinical note saved for the appointment.");
-                          }}
-                        >
-                          Save clinical note
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="dialog-actions">
-                      <button type="button" className="classic-button" onClick={() => setAppointmentSessionId(null)}>
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        className="classic-button primary"
-                        onClick={async () => {
-                          if (!supabase || !appointmentSessionId) return;
-                          const { error } = await supabase
-                            .from("appointments")
-                            .update({
-                              reason: appointmentSessionDraft.reason.trim() || null,
-                              notes: appointmentSessionDraft.notes.trim() || null,
-                            })
-                            .eq("id", appointmentSessionId);
-                          if (error) {
-                            setNotice(error.message);
-                            return;
-                          }
-                          setAppointmentSessionId(null);
-                          setNotice("Appointment session saved");
-                        }}
-                      >
-                        Save details
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            )}
 
             <section className="panel patient-files">
               <div className="panel-title">Patient Files</div>
@@ -1757,7 +1359,7 @@ function Appointments({
       .from("cases")
       .select("id, case_number, title, status, updated_at")
       .eq("patient_id", item.patient_id)
-      .in("status", ["open", "in_treatment", "awaiting_payment"])
+      .in("status", ["open", "in_treatment", "treatment_complete"])
       .order("updated_at", { ascending: false });
 
     if (caseError) {
@@ -1987,17 +1589,12 @@ function Appointments({
                         {item.appointment_type} with {item.provider_name}
                       </span>
 
-                      <small className="appointment-workflow-meta">
-                        {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                          : item.clinical_updated_at
-                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
-                            : item.handed_over_at
-                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
-                              : item.checked_in_at
-                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
-                                : "Not checked in"}
-                      </small>
+                      <AppointmentProgress
+                        status={item.status}
+                        checkedInAt={item.checked_in_at}
+                        handedOverAt={item.handed_over_at}
+                        treatmentCompletedAt={item.treatment_completed_at}
+                      />
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
@@ -2097,17 +1694,12 @@ function Appointments({
                         {item.appointment_type} with {item.provider_name}
                       </span>
 
-                      <small className="appointment-workflow-meta">
-                        {item.treatment_completed_at
-                          ? `Treatment complete ${formatWorkflowTime(item.treatment_completed_at)}${item.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                          : item.clinical_updated_at
-                            ? `Dentist activity ${formatWorkflowTime(item.clinical_updated_at)}`
-                            : item.handed_over_at
-                              ? `Ready for dentist since ${formatWorkflowTime(item.handed_over_at)}`
-                              : item.checked_in_at
-                                ? `Checked in ${formatWorkflowTime(item.checked_in_at)} · waiting for handover`
-                                : "Not checked in"}
-                      </small>
+                      <AppointmentProgress
+                        status={item.status}
+                        checkedInAt={item.checked_in_at}
+                        handedOverAt={item.handed_over_at}
+                        treatmentCompletedAt={item.treatment_completed_at}
+                      />
                     </div>
                     <span className={`status-badge ${item.status}`}>
                       {item.status}
@@ -2316,18 +1908,13 @@ function Appointments({
               </div>
 
               <div className="appointment-workflow-card">
-                <strong>Current workflow</strong>
-                <span>
-                  {selectedAppointment.treatment_completed_at
-                    ? `Treatment complete ${formatWorkflowTime(selectedAppointment.treatment_completed_at)}${selectedAppointment.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                    : selectedAppointment.clinical_updated_at
-                      ? `Dentist activity ${formatWorkflowTime(selectedAppointment.clinical_updated_at)}`
-                      : selectedAppointment.handed_over_at
-                        ? `Ready for dentist since ${formatWorkflowTime(selectedAppointment.handed_over_at)}`
-                        : selectedAppointment.checked_in_at
-                          ? `Checked in ${formatWorkflowTime(selectedAppointment.checked_in_at)} · waiting for handover`
-                          : "Not checked in"}
-                </span>
+                <strong>Visit workflow</strong>
+                <AppointmentProgress
+                  status={selectedAppointment.status}
+                  checkedInAt={selectedAppointment.checked_in_at}
+                  handedOverAt={selectedAppointment.handed_over_at}
+                  treatmentCompletedAt={selectedAppointment.treatment_completed_at}
+                />
                 {selectedAppointment.checked_in_at && (
                   <small>Checked in: {new Date(selectedAppointment.checked_in_at).toLocaleString()}</small>
                 )}
@@ -2450,55 +2037,100 @@ function PatientCaseWorkspace({
   patient,
   caseTab,
   setCaseTab,
-  onCompleteTreatment: _onCompleteTreatment,
-  upcomingAppointment: _upcomingAppointment,
+  onOpenCase,
   setNotice,
 }: {
   patient: Patient | null;
   caseTab: CaseTab;
   setCaseTab: (value: CaseTab) => void;
-  onCompleteTreatment: (appointmentId: string) => Promise<boolean> | boolean;
-  upcomingAppointment: { id: string; appointment_date: string; appointment_time: string; appointment_type: string; status: string; reason: string | null; notes: string | null; provider_name: string | null } | null;
+  onOpenCase: (caseId: string) => void;
   setNotice: (message: string) => void;
 }) {
   const [visitHistory, setVisitHistory] = useState<PatientVisitHistory[]>([]);
+  const [patientCases, setPatientCases] = useState<
+    Array<{
+      id: string;
+      case_number: string;
+      title: string;
+      status: string;
+      billing_status: string;
+      priority: string;
+      assigned_provider_id: string | null;
+      assigned_provider_name: string;
+      last_activity_at: string;
+    }>
+  >([]);
   const [selectedHistoryAppointmentId, setSelectedHistoryAppointmentId] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState("");
 
   useEffect(() => {
-    if (!patient) {
+    if (!patient || !supabase) {
       setVisitHistory([]);
+      setPatientCases([]);
       setSelectedHistoryAppointmentId(null);
       return;
     }
 
-    getPatientVisitHistory(patient.id)
-      .then((entries) => {
-        setVisitHistory(entries);
+    Promise.all([
+      getPatientVisitHistory(patient.id),
+      supabase
+        .from("cases")
+        .select(
+          "id, case_number, title, status, billing_status, priority, assigned_provider_id, last_activity_at",
+        )
+        .eq("patient_id", patient.id)
+        .order("last_activity_at", { ascending: false }),
+      listActiveProviders(),
+    ])
+      .then(([history, caseResult, providers]) => {
+        if (caseResult.error) throw new Error(caseResult.error.message);
+
+        setVisitHistory(history);
         setHistoryError("");
         setSelectedHistoryAppointmentId((currentSelection) => {
-          if (!entries.length) return null;
-          if (currentSelection && entries.some((item) => item.appointment_id === currentSelection)) {
+          if (!history.length) return null;
+          if (
+            currentSelection &&
+            history.some((item) => item.appointment_id === currentSelection)
+          ) {
             return currentSelection;
           }
-          return entries[0].appointment_id;
+          return history[0].appointment_id;
         });
+
+        setPatientCases(
+          (caseResult.data ?? []).map((item) => ({
+            ...item,
+            assigned_provider_name:
+              providers.find((provider) => provider.id === item.assigned_provider_id)
+                ?.full_name ?? "Unassigned",
+          })),
+        );
       })
       .catch((reason) => {
         setVisitHistory([]);
-        setHistoryError(reason instanceof Error ? reason.message : "Patient history could not be loaded.");
+        setPatientCases([]);
+        setHistoryError(
+          reason instanceof Error
+            ? reason.message
+            : "Patient history could not be loaded.",
+        );
       });
   }, [patient]);
 
   return (
     <section className="panel patient-case-workspace">
       <div className="panel-title">
-        Patient Case Workspace
-        <span>{patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}</span>
+        <span>Patient Record</span>
+        <span className="panel-title-hint">
+          {patient ? `${patient.first_name} ${patient.last_name}` : "No patient selected"}
+        </span>
       </div>
+
       <div className="tab-strip">
         {[
-          { id: "history", label: "History" },
+          { id: "cases", label: "Cases" },
+          { id: "history", label: "Visit History" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
@@ -2512,101 +2144,215 @@ function PatientCaseWorkspace({
         ))}
       </div>
 
-      {caseTab === null ? (
+      {caseTab === "cases" ? (
         <div className="patient-case-body">
-          <div className="empty-state">Select a patient history or dental chart view.</div>
+          <div className="patient-case-list">
+            {patientCases.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className="patient-case-card"
+                onClick={() => onOpenCase(item.id)}
+              >
+                <span className="patient-case-card-heading">
+                  <strong>{item.case_number}</strong>
+                  <span className={`case-priority priority-${item.priority}`}>
+                    {item.priority}
+                  </span>
+                </span>
+                <strong>{item.title}</strong>
+                <span>
+                  Clinical: {item.status.replaceAll("_", " ")} · Billing:{" "}
+                  {item.billing_status.replaceAll("_", " ")}
+                </span>
+                <small>
+                  {item.assigned_provider_name} · Last activity{" "}
+                  {new Date(item.last_activity_at).toLocaleString()}
+                </small>
+              </button>
+            ))}
+
+            {!patientCases.length && (
+              <div className="empty-state">
+                No cases for this patient yet. A case is created during check-in.
+              </div>
+            )}
+          </div>
         </div>
       ) : caseTab === "history" ? (
         <div className="patient-case-body">
           {historyError && <p className="send-error">{historyError}</p>}
           {(() => {
             const selectedVisit =
-              visitHistory.find((entry) => entry.appointment_id === selectedHistoryAppointmentId) ??
+              visitHistory.find(
+                (entry) => entry.appointment_id === selectedHistoryAppointmentId,
+              ) ??
               visitHistory[0] ??
               null;
 
             return (
               <div className="case-columns">
                 <div className="case-column">
-                  <h3>Appointment history</h3>
-                  {visitHistory.length ? visitHistory.map((entry) => (
-                    <button
-                      key={entry.appointment_id}
-                      type="button"
-                      className={selectedVisit?.appointment_id === entry.appointment_id ? "history-selector active" : "history-selector"}
-                      onClick={() => setSelectedHistoryAppointmentId(entry.appointment_id)}
-                    >
-                      <div className="history-selector-header">
-                        <strong>{entry.appointment_date}</strong>
-                        <span>{entry.appointment_type}</span>
-                      </div>
-                      <small>{entry.appointment_time} · {appointmentStatusLabel(entry.appointment_status)}</small>
-                      <p>{entry.reason || "No chief complaint recorded."}</p>
-                    </button>
-                  )) : <div className="empty-state">No appointment history saved for this patient yet.</div>}
+                  <h3>Visit history</h3>
+                  {visitHistory.length ? (
+                    visitHistory.map((entry) => (
+                      <button
+                        key={entry.appointment_id}
+                        type="button"
+                        className={
+                          selectedVisit?.appointment_id === entry.appointment_id
+                            ? "history-selector active"
+                            : "history-selector"
+                        }
+                        onClick={() =>
+                          setSelectedHistoryAppointmentId(entry.appointment_id)
+                        }
+                      >
+                        <div className="history-selector-header">
+                          <strong>{entry.appointment_date}</strong>
+                          <span>{entry.appointment_type}</span>
+                        </div>
+                        <small>
+                          {entry.appointment_time} ·{" "}
+                          {appointmentStatusLabel(entry.appointment_status)}
+                        </small>
+                        <p>{entry.reason || "No chief complaint recorded."}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      No appointment history saved for this patient yet.
+                    </div>
+                  )}
                 </div>
 
                 <div className="case-column">
                   {selectedVisit ? (
                     <>
-                      <h3>{selectedVisit.appointment_date} · {selectedVisit.appointment_time}</h3>
+                      <h3>
+                        {selectedVisit.appointment_date} ·{" "}
+                        {selectedVisit.appointment_time}
+                      </h3>
                       <div className="case-note">
-                        <div className="note-meta"><strong>Appointment</strong><span>{selectedVisit.appointment_type}</span></div>
-                        <p><strong>Status:</strong> {appointmentStatusLabel(selectedVisit.appointment_status)}</p>
-                        <p><strong>Dentist:</strong> {selectedVisit.provider_name ?? "Unassigned"}</p>
+                        <div className="note-meta">
+                          <strong>Appointment</strong>
+                          <span>{selectedVisit.appointment_type}</span>
+                        </div>
+                        <p>
+                          <strong>Status:</strong>{" "}
+                          {appointmentStatusLabel(selectedVisit.appointment_status)}
+                        </p>
+                        <p>
+                          <strong>Dentist:</strong>{" "}
+                          {selectedVisit.provider_name ?? "Unassigned"}
+                        </p>
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Reason for visit</strong></div>
-                        <p>{selectedVisit.reason || "No chief complaint recorded."}</p>
+                        <div className="note-meta">
+                          <strong>Reason for visit</strong>
+                        </div>
+                        <p>
+                          {selectedVisit.reason || "No chief complaint recorded."}
+                        </p>
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Assistant notes</strong></div>
-                        <p>{selectedVisit.notes || "No assistant observations recorded."}</p>
+                        <div className="note-meta">
+                          <strong>Treatments / procedures</strong>
+                          <span>{selectedVisit.treatments.length}</span>
+                        </div>
+                        {selectedVisit.treatments.length ? (
+                          selectedVisit.treatments.map((treatment) => (
+                            <p key={treatment.id}>
+                              <strong>{treatment.procedure_name}</strong>
+                              {treatment.tooth_number
+                                ? ` · Tooth ${treatment.tooth_number}`
+                                : ""}
+                              {` · ${formatCurrency(Number(treatment.cost))} · ${treatment.status}`}
+                            </p>
+                          ))
+                        ) : (
+                          <p>No treatment details are available for this visit.</p>
+                        )}
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Treatments / procedures</strong><span>{selectedVisit.treatments.length}</span></div>
-                        {selectedVisit.treatments.length ? selectedVisit.treatments.map((treatment) => (
-                          <p key={treatment.id}>
-                            <strong>{treatment.procedure_name}</strong>
-                            {treatment.tooth_number ? ` · Tooth ${treatment.tooth_number}` : ""}
-                            {` · ${formatCurrency(Number(treatment.cost))} · ${treatment.status}`}
-                          </p>
-                        )) : <p>No treatment details are available for your role or this visit.</p>}
+                        <div className="note-meta">
+                          <strong>Clinical notes</strong>
+                          <span>{selectedVisit.clinical_notes.length}</span>
+                        </div>
+                        {selectedVisit.clinical_notes.length ? (
+                          selectedVisit.clinical_notes.map((note) => (
+                            <div key={note.id}>
+                              <p>
+                                <strong>{note.visit_type}</strong> · {note.note_date}
+                              </p>
+                              {note.subjective && (
+                                <p>
+                                  <strong>Subjective:</strong> {note.subjective}
+                                </p>
+                              )}
+                              {note.assessment && (
+                                <p>
+                                  <strong>Assessment:</strong> {note.assessment}
+                                </p>
+                              )}
+                              {note.plan && (
+                                <p><strong>Plan:</strong> {note.plan}</p>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p>No clinical notes are available for this visit.</p>
+                        )}
                       </div>
+
                       <div className="case-note">
-                        <div className="note-meta"><strong>Clinical notes</strong><span>{selectedVisit.clinical_notes.length}</span></div>
-                        {selectedVisit.clinical_notes.length ? selectedVisit.clinical_notes.map((note) => (
-                          <div key={note.id}>
-                            <p><strong>{note.visit_type}</strong> · {note.note_date}</p>
-                            {note.subjective && <p><strong>Subjective:</strong> {note.subjective}</p>}
-                            {note.assessment && <p><strong>Assessment:</strong> {note.assessment}</p>}
-                            {note.plan && <p><strong>Plan:</strong> {note.plan}</p>}
-                          </div>
-                        )) : <p>No clinical notes are available for your role or this visit.</p>}
-                      </div>
-                      <div className="case-note">
-                        <div className="note-meta"><strong>Billing</strong><span>{selectedVisit.invoice?.status ?? "No invoice"}</span></div>
+                        <div className="note-meta">
+                          <strong>Billing</strong>
+                          <span>
+                            {selectedVisit.invoice?.status ?? "No invoice"}
+                          </span>
+                        </div>
                         {selectedVisit.invoice ? (
                           <>
                             <p><strong>{selectedVisit.invoice.invoice_number}</strong></p>
-                            <p>Total: {formatCurrency(Number(selectedVisit.invoice.total))}</p>
-                            <p>Paid: {formatCurrency(Number(selectedVisit.invoice.amount_paid))}</p>
-                            <p>Balance: {formatCurrency(Number(selectedVisit.invoice.balance))}</p>
+                            <p>
+                              Total:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.total))}
+                            </p>
+                            <p>
+                              Paid:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.amount_paid))}
+                            </p>
+                            <p>
+                              Balance:{" "}
+                              {formatCurrency(Number(selectedVisit.invoice.balance))}
+                            </p>
                           </>
-                        ) : <p>No invoice is linked to this appointment.</p>}
+                        ) : (
+                          <p>No invoice is linked to this appointment.</p>
+                        )}
                       </div>
                     </>
                   ) : (
-                    <div className="empty-state">Select an appointment to view the connected visit history.</div>
+                    <div className="empty-state">
+                      Select an appointment to view the connected visit history.
+                    </div>
                   )}
                 </div>
               </div>
             );
           })()}
         </div>
-      ) : (
+      ) : caseTab === "chart" ? (
         <div className="patient-case-body">
           <DentalChart patient={patient} setNotice={setNotice} />
+        </div>
+      ) : (
+        <div className="patient-case-body">
+          <div className="empty-state">Select a patient record view.</div>
         </div>
       )}
     </section>
@@ -2731,367 +2477,6 @@ function DentalChart({
   );
 }
 
-function Treatments({
-  patient,
-  setNotice,
-}: {
-  patient: Patient | null;
-  setNotice: (message: string) => void;
-}) {
-  const [items, setItems] = useState<
-    Array<{
-      id: string;
-      patient_id: string;
-      treatment_date: string;
-      procedure_name: string;
-      tooth_number: number | null;
-      cost: number;
-      status: string;
-      notes: string | null;
-      patients: { first_name: string; last_name: string } | null;
-    }>
-  >([]);
-  const [patientOptions, setPatientOptions] = useState<Patient[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(patient?.id ?? "");
-  const [showForm, setShowForm] = useState(false);
-  const [editingTreatment, setEditingTreatment] = useState<(typeof items)[number] | null>(null);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    procedure_name: "",
-    tooth_number: "",
-    cost: "",
-    status: "planned",
-    notes: "",
-  });
-
-  const activePatient =
-    patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
-  const visibleItems = activePatient
-    ? items.filter((item) => item.patient_id === activePatient.id)
-    : [];
-
-  const resetForm = () =>
-    setForm({
-      procedure_name: "",
-      tooth_number: "",
-      cost: "",
-      status: "planned",
-      notes: "",
-    });
-
-  useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("patients")
-      .select("id, patient_number, first_name, last_name, date_of_birth, phone, email, is_active, allergies")
-      .eq("is_active", true)
-      .order("last_name")
-      .then(({ data }) => {
-        const nextPatients = data ?? [];
-        setPatientOptions(nextPatients);
-        if (patient && !selectedPatientId) setSelectedPatientId(patient.id);
-        if (patient && !nextPatients.some((option) => option.id === patient.id)) {
-          setSelectedPatientId(patient.id);
-        }
-      });
-
-    const activeId = selectedPatientId || patient?.id;
-    if (!activeId) {
-      setItems([]);
-      return;
-    }
-
-    supabase
-      .from("treatments")
-      .select(
-        "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
-      )
-      .eq("patient_id", activeId)
-      .order("treatment_date", { ascending: false })
-      .then(({ data, error: fetchError }) => {
-        setItems((data ?? []) as unknown as typeof items);
-        if (fetchError) setError(fetchError.message);
-      });
-  }, [patient, selectedPatientId]);
-
-  const openNewTreatment = () => {
-    if (!activePatient) return;
-    setEditingTreatment(null);
-    resetForm();
-    setShowForm(true);
-  };
-
-  const openEditTreatment = (item: (typeof items)[number]) => {
-    setEditingTreatment(item);
-    setForm({
-      procedure_name: item.procedure_name,
-      tooth_number: item.tooth_number?.toString() ?? "",
-      cost: String(item.cost),
-      status: item.status,
-      notes: item.notes ?? "",
-    });
-    setShowForm(true);
-  };
-
-  async function saveTreatment() {
-    if (!supabase || !activePatient) return;
-    if (!form.procedure_name) return;
-
-    const payload = {
-      patient_id: editingTreatment?.patient_id ?? activePatient.id,
-      procedure_name: form.procedure_name.trim(),
-      tooth_number: form.tooth_number ? Number(form.tooth_number) : null,
-      cost: Number(form.cost || 0),
-      status: form.status,
-      notes: form.notes.trim() || null,
-    };
-
-    if (editingTreatment) {
-      const { error: updateError } = await supabase
-        .from("treatments")
-        .update(payload)
-        .eq("id", editingTreatment.id);
-
-      if (updateError) {
-        setError(updateError.message);
-        return;
-      }
-
-      setItems((current) =>
-        current.map((item) =>
-          item.id === editingTreatment.id
-            ? { ...item, ...payload, cost: Number(payload.cost) }
-            : item,
-        ),
-      );
-      setNotice("Treatment updated");
-    } else {
-      const { data: auth } = await supabase.auth.getUser();
-      const { data, error: insertError } = await supabase
-        .from("treatments")
-        .insert({
-          ...payload,
-          provider_id: auth.user?.id,
-          created_by: auth.user?.id,
-        })
-        .select(
-          "id, patient_id, treatment_date, procedure_name, tooth_number, cost, status, notes, patients(first_name, last_name)",
-        )
-        .single();
-
-      if (insertError) {
-        setError(insertError.message);
-        return;
-      }
-
-      if (data) {
-        setItems((current) => [data as unknown as (typeof items)[number], ...current]);
-      }
-      setNotice("Treatment saved");
-    }
-
-    setShowForm(false);
-    setEditingTreatment(null);
-    resetForm();
-  }
-
-  async function deleteTreatment(id: string) {
-    if (!supabase) return;
-    const target = items.find((item) => item.id === id);
-    if (!target) return;
-
-    const confirmed = window.confirm(
-      `Delete the ${target.procedure_name} treatment record?`,
-    );
-    if (!confirmed) return;
-
-    const { error: deleteError } = await supabase
-      .from("treatments")
-      .delete()
-      .eq("id", id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
-    }
-
-    setItems((current) => current.filter((item) => item.id !== id));
-    setNotice("Treatment deleted");
-  }
-
-  return (
-    <section className="panel">
-      <div className="panel-title">
-        Treatment Register{" "}
-        <button
-          type="button"
-          className="classic-button primary"
-          onClick={openNewTreatment}
-          disabled={!activePatient}
-        >
-          + New Treatment
-        </button>
-      </div>
-      <div className="filter-row">
-        <label>
-          Patient
-          <SearchableSelect
-            value={selectedPatientId}
-            onChange={setSelectedPatientId}
-            placeholder="Select patient"
-            searchPlaceholder="Search patient name or number..."
-            emptyMessage="No patients match your search."
-            options={patientOptions.map((option) => ({
-              value: option.id,
-              label: `${option.first_name} ${option.last_name}`,
-              description: option.patient_number,
-              searchText: `${option.patient_number} ${option.first_name} ${option.last_name} ${option.phone ?? ""} ${option.email ?? ""}`,
-            }))}
-          />
-        </label>
-      </div>
-      {error && <p className="send-error">{error}</p>}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Patient</th>
-              <th>Procedure</th>
-              <th>Tooth</th>
-              <th>Cost</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item) => (
-              <tr key={item.id}>
-                <td>{item.treatment_date}</td>
-                <td>
-                  {item.patients
-                    ? `${item.patients.first_name} ${item.patients.last_name}`
-                    : "-"}
-                </td>
-                <td>{item.procedure_name}</td>
-                <td>{item.tooth_number ?? "-"}</td>
-                <td>{formatCurrency(Number(item.cost))}</td>
-                <td>
-                  <span className="status-badge">{item.status}</span>
-                </td>
-                <td>
-                  <div className="dialog-actions">
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => openEditTreatment(item)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="classic-button"
-                      onClick={() => deleteTreatment(item.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!visibleItems.length && (
-          <div className="empty-state">No treatments found for this patient.</div>
-        )}
-      </div>
-      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before adding a treatment.</p>}
-      {showForm && (
-        <div className="modal-backdrop">
-          <section className="classic-dialog" role="dialog" aria-modal="true">
-            <div className="dialog-title">
-              {editingTreatment ? "Edit Treatment" : "New Treatment"}{" "}
-              <button type="button" onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}>
-                X
-              </button>
-            </div>
-            <div className="dialog-body">
-              <p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p>
-              <label>
-                Procedure name
-                <input
-                  value={form.procedure_name}
-                  onChange={(event) =>
-                    setForm({ ...form, procedure_name: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Tooth number
-                <input
-                  type="number"
-                  min="11"
-                  max="48"
-                  value={form.tooth_number}
-                  onChange={(event) =>
-                    setForm({ ...form, tooth_number: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Cost
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.cost}
-                  onChange={(event) => setForm({ ...form, cost: event.target.value })}
-                />
-              </label>
-              <label>
-                Status
-                <select
-                  value={form.status}
-                  onChange={(event) => setForm({ ...form, status: event.target.value })}
-                >
-                  <option value="planned">Planned</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-              <label>
-                Notes
-                <textarea
-                  value={form.notes}
-                  onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                />
-              </label>
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  className="classic-button"
-                  onClick={() => { setShowForm(false); setEditingTreatment(null); resetForm(); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="classic-button primary"
-                  disabled={!form.procedure_name}
-                  onClick={saveTreatment}
-                >
-                  {editingTreatment ? "Save Changes" : "Save Treatment"}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Billing({ patient }: { patient: Patient | null }) {
   const [items, setItems] = useState<
     Array<{
@@ -3120,15 +2505,13 @@ function Billing({ patient }: { patient: Patient | null }) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [message, setMessage] = useState("");
-  const [showForm, setShowForm] = useState(false);
   const [invoiceView, setInvoiceView] = useState<"pending" | "paid">("pending");
-  const [form, setForm] = useState({ total: "", due_date: "", notes: "" });
 
   const activePatient =
     patientOptions.find((option) => option.id === selectedPatientId) ?? patient ?? null;
   const filteredByPatient = activePatient
     ? items.filter((item) => item.patient_id === activePatient.id)
-    : [];
+    : items;
   const pendingInvoices = filteredByPatient.filter((item) => item.status !== "paid");
   const paidInvoices = filteredByPatient.filter((item) => item.status === "paid");
   const visibleInvoices = invoiceView === "pending" ? pendingInvoices : paidInvoices;
@@ -3255,9 +2638,9 @@ function Billing({ patient }: { patient: Patient | null }) {
       setPaymentInvoice(null);
       setPaymentAmount("");
       setMessage(
-        result.appointment_completed
-          ? "Payment recorded. The linked workflow is now complete."
-          : "Payment recorded. Fully paid case invoices close their case automatically.",
+        result.case_billing_status
+          ? `Payment recorded. Case billing is now ${result.case_billing_status.replaceAll("_", " ")}. Clinical status is unchanged.`
+          : "Payment recorded.",
       );
       refreshInvoiceList();
     } catch (reason) {
@@ -3265,24 +2648,33 @@ function Billing({ patient }: { patient: Patient | null }) {
     }
   }
 
-  async function addInvoice() {
-    if (!supabase || !activePatient || !form.total) return;
-    const { data: auth } = await supabase.auth.getUser();
-    const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)").single();
-    if (insertError) setMessage(insertError.message);
-    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; const linkedCase = data.cases as unknown as { case_number: string } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, case_id: data.case_id ?? null, case_number: linkedCase?.case_number ?? "-", patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
-  }
   return (
-    <section className="panel">
-      <div className="panel-title">Invoice Register <button type="button" className="classic-button primary" onClick={() => setShowForm(true)} disabled={!activePatient}>+ New Invoice</button></div>
-      <div className="filter-row">
+    <section className="panel billing-workspace">
+      <div className="panel-title">
+        <span>Billing</span>
+        <span className="panel-title-hint">Invoices are generated from completed Case visits</span>
+      </div>
+      <div className="billing-summary-strip">
+        <div>
+          <span>Pending invoices</span>
+          <strong>{pendingInvoices.length}</strong>
+        </div>
+        <div>
+          <span>Outstanding</span>
+          <strong>{formatCurrency(pendingInvoices.reduce((sum, item) => sum + Number(item.balance), 0))}</strong>
+        </div>
+        <div>
+          <span>Paid invoices</span>
+          <strong>{paidInvoices.length}</strong>
+        </div>
+      </div>
+      <div className="filter-row billing-filter-row">
         <label>
-          Patient
+          Patient filter
           <SearchableSelect
             value={selectedPatientId}
             onChange={setSelectedPatientId}
-            placeholder="Select patient"
+            placeholder="All patients"
             searchPlaceholder="Search patient name or number..."
             emptyMessage="No patients match your search."
             options={patientOptions.map((option) => ({
@@ -3293,8 +2685,16 @@ function Billing({ patient }: { patient: Patient | null }) {
             }))}
           />
         </label>
+        {selectedPatientId && (
+          <button
+            type="button"
+            className="classic-button"
+            onClick={() => setSelectedPatientId("")}
+          >
+            Show all
+          </button>
+        )}
       </div>
-      {!activePatient && <p className="empty-state">Choose a patient from the dropdown before creating an invoice.</p>}
 
       <div className="billing-tab-strip tab-strip">
         <button
@@ -3428,7 +2828,6 @@ function Billing({ patient }: { patient: Patient | null }) {
           </section>
         </div>
       )}
-      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Invoice <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p><label>Total amount<input type="number" min="0" step="0.01" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label><label>Due date<input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.total} onClick={addInvoice}>Save Invoice</button></div></div></section></div>}
     </section>
   );
 }
