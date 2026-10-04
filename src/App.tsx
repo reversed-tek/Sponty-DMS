@@ -2928,6 +2928,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       balance: number;
       status: string;
       patient_id: string;
+      case_id: string | null;
+      case_number: string;
       patient: string;
       email: string;
     }>
@@ -2961,6 +2963,7 @@ function Billing({ patient }: { patient: Patient | null }) {
       <tr key={item.id}>
         <td>{item.invoice_number}</td>
         <td>{item.patient}</td>
+        <td>{item.case_number}</td>
         <td>{item.invoice_date}</td>
         <td>{formatCurrency(Number(item.total))}</td>
         <td>{formatCurrency(Number(item.balance))}</td>
@@ -3010,7 +3013,7 @@ function Billing({ patient }: { patient: Patient | null }) {
     supabase
       .from("invoices")
       .select(
-        "id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)",
+        "id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)",
       )
       .order("invoice_date", { ascending: false })
       .then(({ data }) =>
@@ -3021,9 +3024,14 @@ function Billing({ patient }: { patient: Patient | null }) {
               last_name: string;
               email: string | null;
             } | null;
+            const caseData = item.cases as unknown as {
+              case_number: string;
+            } | null;
             return {
               ...item,
               patient_id: item.patient_id,
+              case_id: item.case_id ?? null,
+              case_number: caseData?.case_number ?? "-",
               patient: patientData
                 ? `${patientData.first_name} ${patientData.last_name}`
                 : "Unknown patient",
@@ -3073,8 +3081,8 @@ function Billing({ patient }: { patient: Patient | null }) {
       setPaymentAmount("");
       setMessage(
         result.appointment_completed
-          ? "Payment recorded. The linked appointment is now complete."
-          : "Payment recorded.",
+          ? "Payment recorded. The linked workflow is now complete."
+          : "Payment recorded. Fully paid case invoices close their case automatically.",
       );
       refreshInvoiceList();
     } catch (reason) {
@@ -3086,9 +3094,9 @@ function Billing({ patient }: { patient: Patient | null }) {
     if (!supabase || !activePatient || !form.total) return;
     const { data: auth } = await supabase.auth.getUser();
     const total = Number(form.total);
-    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email)").single();
+    const { data, error: insertError } = await supabase.from("invoices").insert({ invoice_number: `INV-${Date.now().toString().slice(-8)}`, patient_id: activePatient.id, due_date: form.due_date || null, subtotal: total, total, balance: total, notes: form.notes, created_by: auth.user?.id }).select("id, patient_id, case_id, invoice_number, invoice_date, total, amount_paid, balance, status, patients(first_name, last_name, email), cases(case_number)").single();
     if (insertError) setMessage(insertError.message);
-    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
+    else if (data) { const linked = data.patients as unknown as { first_name: string; last_name: string; email: string | null } | null; const linkedCase = data.cases as unknown as { case_number: string } | null; setItems((current) => [{ ...data, patient_id: data.patient_id, case_id: data.case_id ?? null, case_number: linkedCase?.case_number ?? "-", patient: linked ? `${linked.first_name} ${linked.last_name}` : "Unknown patient", email: linked?.email ?? "" }, ...current]); setShowForm(false); setForm({ total: "", due_date: "", notes: "" }); }
   }
   return (
     <section className="panel">
@@ -3137,6 +3145,7 @@ function Billing({ patient }: { patient: Patient | null }) {
               <tr>
                 <th>Invoice</th>
                 <th>Patient</th>
+                <th>Case</th>
                 <th>Date</th>
                 <th>Total</th>
                 <th>Balance</th>
