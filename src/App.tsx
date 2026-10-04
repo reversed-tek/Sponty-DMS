@@ -892,6 +892,11 @@ function Patients({
                   </span>
                 </div>
               </div>
+              {selected.allergies && (
+                <div className="medical-alert patient-record-alert">
+                  <strong>Patient alert:</strong> {selected.allergies}
+                </div>
+              )}
               {upcomingAppointment && (
                 <div className="appointment-detail-card">
                   <div>
