@@ -142,6 +142,9 @@ where i.case_id is null
 
 -- Check-in is now the point where reception explicitly chooses whether to
 -- create a new Case or attach the appointment to an existing active Case.
+drop function if exists public.check_in_appointment(uuid);
+drop function if exists public.check_in_appointment(uuid, text, text);
+
 create or replace function public.check_in_appointment(
   p_appointment_id uuid,
   p_case_title text default null,
