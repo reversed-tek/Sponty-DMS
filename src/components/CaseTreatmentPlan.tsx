@@ -32,12 +32,14 @@ export function CaseTreatmentPlan({
   selectedVisitStatus,
   onNotice,
   onChanged,
+  readOnly = false,
 }: {
   caseId: string;
   selectedVisitId: string | null;
   selectedVisitStatus: string | null;
   onNotice: (message: string) => void;
   onChanged?: () => void;
+  readOnly?: boolean;
 }) {
   const [items, setItems] = useState<PlanItem[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -199,6 +201,7 @@ export function CaseTreatmentPlan({
         <button
           type="button"
           className="classic-button primary"
+          disabled={readOnly}
           onClick={() => setShowForm((current) => !current)}
         >
           {showForm ? "Cancel" : "+ Plan Treatment"}
@@ -287,7 +290,7 @@ export function CaseTreatmentPlan({
             <button
               type="button"
               className="classic-button primary"
-              disabled={saving || !draft.procedureName.trim()}
+              disabled={saving || readOnly || !draft.procedureName.trim()}
               onClick={() => void addItem()}
             >
               Add to Plan
@@ -320,7 +323,7 @@ export function CaseTreatmentPlan({
                     <button
                       type="button"
                       className="classic-button primary"
-                      disabled={saving}
+                      disabled={saving || readOnly}
                       onClick={() => void setStatus(item, "accepted")}
                     >
                       Accept
@@ -328,7 +331,7 @@ export function CaseTreatmentPlan({
                     <button
                       type="button"
                       className="classic-button"
-                      disabled={saving}
+                      disabled={saving || readOnly}
                       onClick={() => void setStatus(item, "deferred")}
                     >
                       Defer
@@ -339,7 +342,7 @@ export function CaseTreatmentPlan({
                   <button
                     type="button"
                     className="classic-button"
-                    disabled={saving}
+                    disabled={saving || readOnly}
                     onClick={() => void setStatus(item, "accepted")}
                   >
                     Accept
@@ -351,6 +354,7 @@ export function CaseTreatmentPlan({
                     className="classic-button primary"
                     disabled={
                       saving ||
+                      readOnly ||
                       !selectedVisitId ||
                       selectedVisitStatus !== "in_progress"
                     }
@@ -363,7 +367,7 @@ export function CaseTreatmentPlan({
                   <button
                     type="button"
                     className="classic-button danger"
-                    disabled={saving}
+                    disabled={saving || readOnly}
                     onClick={() => void setStatus(item, "cancelled")}
                   >
                     Cancel
