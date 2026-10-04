@@ -1017,6 +1017,7 @@ export function Cases({
                     selectedVisitStatus={selectedVisit?.status ?? null}
                     onNotice={setNotice}
                     onChanged={() => void refreshSelectedCase()}
+                    readOnly={selectedCase.status === "closed"}
                   />
                 )}
 
@@ -1323,7 +1324,11 @@ export function Cases({
                 )}
 
                 {tab === "tasks" && (
-                  <CaseTasks caseId={selectedCase.id} onNotice={setNotice} />
+                  <CaseTasks
+                    caseId={selectedCase.id}
+                    onNotice={setNotice}
+                    readOnly={selectedCase.status === "closed"}
+                  />
                 )}
 
                 {tab === "billing" && (
