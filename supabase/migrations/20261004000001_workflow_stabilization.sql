@@ -197,7 +197,7 @@ returns public.appointments
 language plpgsql
 security definer
 set search_path = public
-as $
+as $checkin$
 declare
   appointment_row public.appointments;
   case_row public.cases;
@@ -354,7 +354,7 @@ begin
 
   return appointment_row;
 end;
-$;
+$checkin$;
 
 revoke all on function public.check_in_appointment(uuid, text, text, uuid, boolean) from public;
 grant execute on function public.check_in_appointment(uuid, text, text, uuid, boolean) to authenticated;
