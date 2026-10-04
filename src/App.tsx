@@ -497,28 +497,6 @@ function Patients({
   }, [selected]);
 
   useEffect(() => {
-    if (!supabase || !form.patient_id) {
-      setBookableCases([]);
-      return;
-    }
-
-    void supabase
-      .from("cases")
-      .select("id, case_number, title, status, updated_at")
-      .eq("patient_id", form.patient_id)
-      .in("status", ["open", "in_treatment", "treatment_complete"])
-      .order("updated_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setMessage(error.message);
-          setBookableCases([]);
-          return;
-        }
-        setBookableCases((data ?? []) as ExistingCaseOption[]);
-      });
-  }, [form.patient_id]);
-
-  useEffect(() => {
     const client = supabase;
     if (!client || !selected) {
       setPatientFiles([]);
@@ -1184,6 +1162,28 @@ function Appointments({
     appointment_type: "checkup",
     reason: "",
   });
+  useEffect(() => {
+    if (!supabase || !form.patient_id) {
+      setBookableCases([]);
+      return;
+    }
+
+    void supabase
+      .from("cases")
+      .select("id, case_number, title, status, updated_at")
+      .eq("patient_id", form.patient_id)
+      .in("status", ["open", "in_treatment", "treatment_complete"])
+      .order("updated_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setMessage(error.message);
+          setBookableCases([]);
+          return;
+        }
+        setBookableCases((data ?? []) as ExistingCaseOption[]);
+      });
+  }, [form.patient_id]);
+
   const activeAppointments = items.filter((item) => !["completed", "cancelled", "no_show"].includes(item.status));
   const completedAppointments = items.filter((item) => item.status === "completed");
   useEffect(() => {
