@@ -24,6 +24,8 @@ export function Dashboard({
     activeCases: 0,
     pendingInvoices: 0,
     overdueInvoices: 0,
+    openTasks: 0,
+    recallsDue: 0,
   });
   const [attention, setAttention] = useState<AttentionItem[]>([]);
 
@@ -31,6 +33,9 @@ export function Dashboard({
     if (!supabase) return;
 
     const today = new Date().toISOString().slice(0, 10);
+    const recallWindow = new Date();
+    recallWindow.setDate(recallWindow.getDate() + 14);
+    const recallWindowDate = recallWindow.toISOString().slice(0, 10);
 
     Promise.all([
       supabase
@@ -52,11 +57,28 @@ export function Dashboard({
         .select("id, invoice_number, due_date, balance, status, case_id")
         .gt("balance", 0)
         .neq("status", "cancelled"),
+      supabase
+        .from("case_tasks")
+        .select(
+          "id, case_id, title, description, priority, due_at, source, cases(case_number, title)",
+        )
+        .eq("status", "open")
+        .order("due_at", { ascending: true, nullsFirst: false }),
+      supabase
+        .from("patient_recalls")
+        .select(
+          "id, patient_id, recall_type, due_date, status, patients(first_name, last_name)",
+        )
+        .in("status", ["open", "scheduled"])
+        .lte("due_date", recallWindowDate)
+        .order("due_date"),
     ])
-      .then(([appointmentResult, caseResult, invoiceResult]) => {
+      .then(([appointmentResult, caseResult, invoiceResult, taskResult, recallResult]) => {
         const appointments = appointmentResult.data ?? [];
         const cases = caseResult.data ?? [];
         const invoices = invoiceResult.data ?? [];
+        const tasks = taskResult.data ?? [];
+        const recalls = recallResult.data ?? [];
 
         const checkedIn = appointments.filter(
           (item) =>
@@ -141,6 +163,46 @@ export function Dashboard({
           });
         }
 
+        for (const task of tasks.slice(0, 4)) {
+          const caseData = task.cases as unknown as {
+            case_number: string;
+            title: string;
+          } | null;
+          const overdueTask =
+            task.due_at && new Date(task.due_at).getTime() < Date.now();
+
+          attentionItems.push({
+            id: `task-${task.id}`,
+            page: "Cases",
+            title: task.title,
+            detail: `${caseData?.case_number ?? "Case"} · ${task.source === "automated" ? "automated" : "manual"}${task.due_at ? ` · due ${new Date(task.due_at).toLocaleString()}` : ""}`,
+            urgency:
+              task.priority === "urgent" || overdueTask
+                ? "urgent"
+                : task.priority === "high"
+                  ? "warning"
+                  : "normal",
+          });
+        }
+
+        for (const recall of recalls.slice(0, 4)) {
+          const patient = recall.patients as unknown as {
+            first_name: string;
+            last_name: string;
+          } | null;
+          const overdueRecall = recall.due_date < today;
+
+          attentionItems.push({
+            id: `recall-${recall.id}`,
+            page: "Patients",
+            title: patient
+              ? `${patient.first_name} ${patient.last_name} recall ${overdueRecall ? "overdue" : "due"}`
+              : `Patient recall ${overdueRecall ? "overdue" : "due"}`,
+            detail: `${recall.recall_type.replaceAll("_", " ")} · ${recall.due_date}`,
+            urgency: overdueRecall ? "urgent" : "warning",
+          });
+        }
+
         setCounts({
           appointments: appointments.filter(
             (item) => !["cancelled", "no_show"].includes(item.status),
@@ -150,6 +212,8 @@ export function Dashboard({
           activeCases: cases.length,
           pendingInvoices: invoices.length,
           overdueInvoices: overdue.length,
+          openTasks: tasks.length,
+          recallsDue: recalls.length,
         });
         setAttention(attentionItems.slice(0, 8));
         setLoading(false);
@@ -188,6 +252,16 @@ export function Dashboard({
         label: "Overdue invoices",
         value: counts.overdueInvoices,
         page: "Billing" as const,
+      },
+      {
+        label: "Open tasks",
+        value: counts.openTasks,
+        page: "Cases" as const,
+      },
+      {
+        label: "Recalls due",
+        value: counts.recallsDue,
+        page: "Patients" as const,
       },
     ],
     [counts],
