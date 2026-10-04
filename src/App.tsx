@@ -21,6 +21,7 @@ import { SearchableSelect } from "./components/SearchableSelect";
 import { Cases } from "./components/Cases";
 import { Dashboard } from "./components/Dashboard";
 import { AppointmentProgress } from "./components/AppointmentProgress";
+import { PatientRecalls } from "./components/PatientRecalls";
 
 type Page =
   | "Dashboard"
@@ -31,7 +32,7 @@ type Page =
   | "Reports"
   | "User Settings"
   | "Practice Settings";
-type CaseTab = "cases" | "chart" | "history" | null;
+type CaseTab = "cases" | "history" | "recalls" | "chart" | null;
 type Patient = {
   id: string;
   patient_number: string;
@@ -2131,6 +2132,7 @@ function PatientCaseWorkspace({
         {[
           { id: "cases", label: "Cases" },
           { id: "history", label: "Visit History" },
+          { id: "recalls", label: "Recalls" },
           { id: "chart", label: "Dental Chart" },
         ].map((tab) => (
           <button
@@ -2345,6 +2347,10 @@ function PatientCaseWorkspace({
               </div>
             );
           })()}
+        </div>
+      ) : caseTab === "recalls" && patient ? (
+        <div className="patient-case-body">
+          <PatientRecalls patientId={patient.id} onNotice={setNotice} />
         </div>
       ) : caseTab === "chart" ? (
         <div className="patient-case-body">
