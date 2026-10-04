@@ -19,9 +19,11 @@ type CaseTask = {
 export function CaseTasks({
   caseId,
   onNotice,
+  readOnly = false,
 }: {
   caseId: string;
   onNotice: (message: string) => void;
+  readOnly?: boolean;
 }) {
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -209,7 +211,7 @@ export function CaseTasks({
             <button
               type="button"
               className="classic-button primary"
-              disabled={saving || !draft.title.trim()}
+              disabled={saving || readOnly || !draft.title.trim()}
               onClick={() => void addTask()}
             >
               Add Task
