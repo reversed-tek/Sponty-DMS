@@ -339,6 +339,17 @@ begin
       and status in ('open', 'scheduled')
     limit 1
     for update;
+  else
+    select *
+    into recall_row
+    from public.patient_recalls
+    where patient_id = p_patient_id
+      and case_id is null
+      and recall_type = p_recall_type
+      and status in ('open', 'scheduled')
+    order by due_date
+    limit 1
+    for update;
   end if;
 
   if recall_row.id is not null then
