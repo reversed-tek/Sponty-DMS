@@ -1903,18 +1903,13 @@ function Appointments({
               </div>
 
               <div className="appointment-workflow-card">
-                <strong>Current workflow</strong>
-                <span>
-                  {selectedAppointment.treatment_completed_at
-                    ? `Treatment complete ${formatWorkflowTime(selectedAppointment.treatment_completed_at)}${selectedAppointment.status === "completed" ? " · paid / closed" : " · awaiting payment"}`
-                    : selectedAppointment.clinical_updated_at
-                      ? `Dentist activity ${formatWorkflowTime(selectedAppointment.clinical_updated_at)}`
-                      : selectedAppointment.handed_over_at
-                        ? `Ready for dentist since ${formatWorkflowTime(selectedAppointment.handed_over_at)}`
-                        : selectedAppointment.checked_in_at
-                          ? `Checked in ${formatWorkflowTime(selectedAppointment.checked_in_at)} · waiting for handover`
-                          : "Not checked in"}
-                </span>
+                <strong>Visit workflow</strong>
+                <AppointmentProgress
+                  status={selectedAppointment.status}
+                  checkedInAt={selectedAppointment.checked_in_at}
+                  handedOverAt={selectedAppointment.handed_over_at}
+                  treatmentCompletedAt={selectedAppointment.treatment_completed_at}
+                />
                 {selectedAppointment.checked_in_at && (
                   <small>Checked in: {new Date(selectedAppointment.checked_in_at).toLocaleString()}</small>
                 )}
@@ -2828,7 +2823,6 @@ function Billing({ patient }: { patient: Patient | null }) {
           </section>
         </div>
       )}
-      {showForm && <div className="modal-backdrop"><section className="classic-dialog" role="dialog" aria-modal="true"><div className="dialog-title">New Invoice <button type="button" onClick={() => setShowForm(false)}>X</button></div><div className="dialog-body"><p className="dialog-intro">Patient: {activePatient?.first_name} {activePatient?.last_name}</p><label>Total amount<input type="number" min="0" step="0.01" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} /></label><label>Due date<input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></label><label>Notes<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.total} onClick={addInvoice}>Save Invoice</button></div></div></section></div>}
     </section>
   );
 }
