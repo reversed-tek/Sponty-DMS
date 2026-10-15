@@ -75,6 +75,14 @@ export type ProviderDirectoryEntry = {
   role: 'dentist' | 'admin'
 }
 
+export type ActiveCaseDirectoryEntry = {
+  id: string
+  case_number: string
+  title: string
+  status: string
+  updated_at: string
+}
+
 export type VisitHistoryTreatment = {
   id: string
   procedure_name: string
@@ -203,6 +211,14 @@ export async function listActiveProviders() {
     .order('full_name')
   if (error) throw new Error(error.message)
   return (data ?? []) as ProviderDirectoryEntry[]
+}
+
+export async function listPatientActiveCases(patientId: string) {
+  const { data, error } = await client().rpc('list_patient_active_cases_for_staff', {
+    p_patient_id: patientId,
+  })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ActiveCaseDirectoryEntry[]
 }
 
 export async function getPatientVisitHistory(patientId: string) {
