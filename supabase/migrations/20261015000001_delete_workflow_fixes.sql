@@ -14,6 +14,32 @@ begin;
 -- Appointment delete RPC
 -- ============================================================
 
+-- Remove any legacy broad policy so direct client DELETE cannot bypass the
+-- guarded RPC. Preserve normal read/create/update access for active staff.
+drop policy if exists appointments_access on public.appointments;
+drop policy if exists appointments_select_access on public.appointments;
+drop policy if exists appointments_insert_access on public.appointments;
+drop policy if exists appointments_update_access on public.appointments;
+
+create policy appointments_select_access
+on public.appointments
+for select
+to authenticated
+using (public.current_user_role() in ('admin', 'dentist', 'receptionist'));
+
+create policy appointments_insert_access
+on public.appointments
+for insert
+to authenticated
+with check (public.current_user_role() in ('admin', 'dentist', 'receptionist'));
+
+create policy appointments_update_access
+on public.appointments
+for update
+to authenticated
+using (public.current_user_role() in ('admin', 'dentist', 'receptionist'))
+with check (public.current_user_role() in ('admin', 'dentist', 'receptionist'));
+
 create or replace function public.delete_appointment(p_appointment_id uuid)
 returns jsonb
 language plpgsql
@@ -204,7 +230,33 @@ $$;
 -- Safe patient delete RPC
 -- ============================================================
 
+drop policy if exists patients_access on public.patients;
+drop policy if exists patients_select_staff on public.patients;
+drop policy if exists patients_insert_clinical on public.patients;
+drop policy if exists patients_update_clinical on public.patients;
 drop policy if exists patients_delete_clinical on public.patients;
+
+-- Keep patient identity reads available to active staff for appointment and
+-- billing selectors, but only Dentist/Admin may create or edit patient records.
+-- No direct DELETE policy is recreated: permanent delete must use delete_patient.
+create policy patients_select_staff
+on public.patients
+for select
+to authenticated
+using (public.current_user_role() in ('admin', 'dentist', 'receptionist'));
+
+create policy patients_insert_clinical
+on public.patients
+for insert
+to authenticated
+with check (public.current_user_role() in ('admin', 'dentist'));
+
+create policy patients_update_clinical
+on public.patients
+for update
+to authenticated
+using (public.current_user_role() in ('admin', 'dentist'))
+with check (public.current_user_role() in ('admin', 'dentist'));
 
 create or replace function public.delete_patient(p_patient_id uuid)
 returns jsonb
