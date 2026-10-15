@@ -180,6 +180,18 @@ export async function deleteAppointment(appointmentId: string) {
   }
 }
 
+export async function deletePatientRecord(patientId: string) {
+  const { data, error } = await client().rpc('delete_patient', {
+    p_patient_id: patientId,
+  })
+  if (error) throw new Error(error.message)
+  return data as {
+    patient_id: string
+    patient_number: string
+    deleted: boolean
+  }
+}
+
 export async function completeTreatmentWorkflow(appointmentId: string) {
   const { data, error } = await client().rpc('complete_treatment_workflow', { p_appointment_id: appointmentId })
   if (error) throw new Error(error.message)
