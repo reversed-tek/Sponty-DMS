@@ -32,7 +32,8 @@ export function Dashboard({
   const [attention, setAttention] = useState<AttentionItem[]>([]);
 
   useEffect(() => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
 
     let cancelled = false;
 
@@ -44,14 +45,14 @@ export function Dashboard({
 
       try {
         const [appointmentResult, invoiceResult] = await Promise.all([
-          supabase
+          client
             .from("appointments")
             .select(
               "id, patient_id, appointment_date, appointment_time, status, checked_in_at, handed_over_at, treatment_completed_at, patients(first_name, last_name)",
             )
             .eq("appointment_date", today)
             .order("appointment_time"),
-          supabase
+          client
             .from("invoices")
             .select("id, invoice_number, due_date, balance, status, case_id")
             .gt("balance", 0)
@@ -156,21 +157,21 @@ export function Dashboard({
 
         if (viewerRole !== "receptionist") {
           const [caseResult, taskResult, recallResult] = await Promise.all([
-            supabase
+            client
               .from("cases")
               .select(
                 "id, case_number, title, status, billing_status, priority, last_activity_at, patients(first_name, last_name)",
               )
               .neq("status", "closed")
               .order("last_activity_at", { ascending: false }),
-            supabase
+            client
               .from("case_tasks")
               .select(
                 "id, case_id, title, description, priority, due_at, source, cases(case_number, title)",
               )
               .eq("status", "open")
               .order("due_at", { ascending: true, nullsFirst: false }),
-            supabase
+            client
               .from("patient_recalls")
               .select(
                 "id, patient_id, recall_type, due_date, status, patients(first_name, last_name)",
