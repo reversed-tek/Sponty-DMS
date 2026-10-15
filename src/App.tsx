@@ -4,6 +4,7 @@ import { issuePatientPortalAccess, signInWithMicrosoft, signOut, supabase } from
 import {
   checkInAppointment,
   deleteAppointment,
+  deletePatientRecord,
   getPatientVisitHistory,
   handoverAppointmentToDentist,
   listActiveProviders,
@@ -701,25 +702,32 @@ function Patients({
   }
 
   async function deletePatient(patient: Patient) {
-    if (!supabase) return;
     const confirmed = window.confirm(
-      `Delete patient ${patient.first_name} ${patient.last_name}? This will also remove associated records from the system.`,
+      `Permanently delete patient ${patient.first_name} ${patient.last_name}? Only patients without linked appointment, clinical, or billing history can be deleted.`,
     );
     if (!confirmed) return;
 
-    const { error: deleteError } = await supabase
-      .from("patients")
-      .delete()
-      .eq("id", patient.id);
+    try {
+      await deletePatientRecord(patient.id);
+      setPatients((current) => current.filter((item) => item.id !== patient.id));
+      if (selected?.id === patient.id) setSelected(null);
+      setNotice("Patient deleted");
+    } catch (reason) {
+      const rawMessage =
+        reason instanceof Error ? reason.message : "Patient could not be deleted.";
 
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
+      if (rawMessage.includes("patient_has_linked_history")) {
+        setError(
+          "This patient has appointment, clinical, or billing history and cannot be permanently deleted.",
+        );
+      } else if (rawMessage.includes("dentist_or_admin_required")) {
+        setError("Only a Dentist or System Administrator can permanently delete a patient.");
+      } else {
+        setError(rawMessage);
+      }
+
+      setNotice("Patient delete blocked");
     }
-
-    setPatients((current) => current.filter((item) => item.id !== patient.id));
-    if (selected?.id === patient.id) setSelected(null);
-    setNotice("Patient deleted");
   }
 
   async function createPatientPortalAccess(patient: Patient) {
