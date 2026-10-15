@@ -3008,7 +3008,13 @@ function UserManagement() {
   const [filter, setFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<Profile | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    auth_id: string;
+    full_name: string;
+    email: string;
+    role: AppRole;
+    is_active: boolean;
+  }>({
     auth_id: "",
     full_name: "",
     email: "",
@@ -3293,7 +3299,7 @@ function UserManagement() {
                 <select
                   value={form.role}
                   onChange={(event) =>
-                    setForm({ ...form, role: event.target.value })
+                    setForm({ ...form, role: event.target.value as AppRole })
                   }
                 >
                   <option value="admin">Admin</option>
