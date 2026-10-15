@@ -21,13 +21,12 @@ export async function signInWithMicrosoft() {
   if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.')
   const appUrl = appEnv.appUrl
   return supabase.auth.signInWithOAuth({
-    provider: 'azure',
-    options: {
-      scopes: 'openid profile email User.Read Mail.Send Calendars.ReadWrite offline_access',
-      redirectTo: `${appUrl}/auth/callback`,
-      queryParams: { prompt: 'consent' },
-    },
-  })
+  provider: 'azure',
+  options: {
+    scopes: 'openid profile email User.Read Mail.Send Calendars.ReadWrite offline_access',
+    redirectTo: `${appUrl}/auth/callback`,
+  },
+})
 }
 
 export async function signOut() {
