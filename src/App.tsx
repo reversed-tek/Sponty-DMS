@@ -104,14 +104,13 @@ const rolePageAccess: Record<AppRole, readonly Page[]> = {
     "Practice Settings",
   ],
   dentist: ["Dashboard", "Patients", "Appointments", "Cases", "Billing", "Reports"],
-  receptionist: ["Appointments", "Billing"],
+  receptionist: ["Dashboard", "Appointments", "Billing"],
 };
 
 const canAccessPage = (role: AppRole, page: Page) =>
   rolePageAccess[role].includes(page);
 
-const defaultPageForRole = (role: AppRole): Page =>
-  role === "receptionist" ? "Appointments" : "Dashboard";
+const defaultPageForRole = (_role: AppRole): Page => "Dashboard";
 
 const navItemsForRole = (role: AppRole) =>
   primaryNavItems.filter((item) => canAccessPage(role, item));
@@ -363,7 +362,9 @@ function App() {
               <h1>{activePage}</h1>
             </div>
           </div>
-          {activePage === "Dashboard" && <Dashboard navigate={navigate} />}
+          {activePage === "Dashboard" && (
+            <Dashboard navigate={navigate} viewerRole={profile.role} />
+          )}
           {activePage === "Patients" && (
             <Patients
               search={search}
