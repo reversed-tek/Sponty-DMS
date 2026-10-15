@@ -7,6 +7,7 @@ import {
   getPatientVisitHistory,
   handoverAppointmentToDentist,
   listActiveProviders,
+  listPatientActiveCases,
   recordInvoicePayment,
 } from "./lib/workflow";
 import type { PatientVisitHistory, ProviderDirectoryEntry } from "./lib/workflow";
@@ -23,6 +24,7 @@ import { Dashboard } from "./components/Dashboard";
 import { AppointmentProgress } from "./components/AppointmentProgress";
 import { PatientRecalls } from "./components/PatientRecalls";
 
+type AppRole = "admin" | "dentist" | "receptionist";
 type Page =
   | "Dashboard"
   | "Patients"
@@ -48,7 +50,7 @@ type Profile = {
   id: string;
   full_name: string;
   email: string;
-  role: string;
+  role: AppRole;
   is_active: boolean;
   last_login_at: string | null;
 };
@@ -81,7 +83,7 @@ type Appointment = {
   case_id: string | null;
 };
 
-const navItems: Page[] = [
+const primaryNavItems: Page[] = [
   "Dashboard",
   "Patients",
   "Appointments",
@@ -89,6 +91,30 @@ const navItems: Page[] = [
   "Billing",
   "User Settings",
 ];
+
+const rolePageAccess: Record<AppRole, readonly Page[]> = {
+  admin: [
+    "Dashboard",
+    "Patients",
+    "Appointments",
+    "Cases",
+    "Billing",
+    "Reports",
+    "User Settings",
+    "Practice Settings",
+  ],
+  dentist: ["Dashboard", "Patients", "Appointments", "Cases", "Billing", "Reports"],
+  receptionist: ["Appointments", "Billing"],
+};
+
+const canAccessPage = (role: AppRole, page: Page) =>
+  rolePageAccess[role].includes(page);
+
+const defaultPageForRole = (role: AppRole): Page =>
+  role === "receptionist" ? "Appointments" : "Dashboard";
+
+const navItemsForRole = (role: AppRole) =>
+  primaryNavItems.filter((item) => canAccessPage(role, item));
 const toothNumbers = [
   18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28, 48, 47, 46,
   45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
@@ -96,7 +122,7 @@ const toothNumbers = [
 const queryError = (error: { message: string } | null) => error?.message ?? "";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
-const roleLabel = (role: string) =>
+const roleLabel = (role: AppRole) =>
   role === "admin"
     ? "System Administrator"
     : role === "dentist"
@@ -217,7 +243,19 @@ function App() {
       </div>
     );
 
+  const activePage = canAccessPage(profile.role, page)
+    ? page
+    : defaultPageForRole(profile.role);
+  const visibleNavItems = navItemsForRole(profile.role);
+
   const navigate = (next: Page) => {
+    if (!canAccessPage(profile.role, next)) {
+      const fallback = defaultPageForRole(profile.role);
+      setPage(fallback);
+      setNotice(`Access restricted for ${roleLabel(profile.role)}.`);
+      return;
+    }
+
     setPage(next);
     setNotice(`${next} selected`);
   };
@@ -275,31 +313,35 @@ function App() {
         </div>
       </header>
       <div className="menu-bar">
-        <button type="button" onClick={() => navigate("Patients")}>File</button>
+        <button type="button" onClick={() => navigate(defaultPageForRole(profile.role))}>File</button>
         <button type="button" onClick={() => setNotice("Select a record to edit")}>Edit</button>
         <button type="button" onClick={() => navigate("Appointments")}>View</button>
-        <button type="button" onClick={() => navigate("User Settings")}>Tools</button>
+        {profile.role === "admin" && (
+          <button type="button" onClick={() => navigate("User Settings")}>Tools</button>
+        )}
         <button type="button" onClick={() => setNotice("Use the sidebar to open a module")}>Help</button>
       </div>
-      <div className="toolbar">
-        <label className="quick-search">
-          Quick Find:{" "}
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="patient name or number"
-          />
-        </label>
-      </div>
+      {canAccessPage(profile.role, "Patients") && (
+        <div className="toolbar">
+          <label className="quick-search">
+            Quick Find:{" "}
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="patient name or number"
+            />
+          </label>
+        </div>
+      )}
       <div className="workspace">
         <aside className="sidebar">
           <div className="sidebar-heading">Practice Menu</div>
           <nav>
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <button
                 type="button"
                 key={item}
-                className={page === item ? "nav-item active" : "nav-item"}
+                className={activePage === item ? "nav-item active" : "nav-item"}
                 onClick={() => navigate(item)}
               >
                 {item}
@@ -317,12 +359,12 @@ function App() {
         <main className="main-panel">
           <div className="page-heading">
             <div>
-              <div className="breadcrumbs">Practice / {page}</div>
-              <h1>{page}</h1>
+              <div className="breadcrumbs">Practice / {activePage}</div>
+              <h1>{activePage}</h1>
             </div>
           </div>
-          {page === "Dashboard" && <Dashboard navigate={navigate} />}
-          {page === "Patients" && (
+          {activePage === "Dashboard" && <Dashboard navigate={navigate} />}
+          {activePage === "Patients" && (
             <Patients
               search={search}
               selected={selectedPatient}
@@ -334,7 +376,7 @@ function App() {
               }}
             />
           )}
-          {page === "Appointments" && (
+          {activePage === "Appointments" && (
             <Appointments
               setNotice={setNotice}
               viewerProfile={profile}
@@ -346,17 +388,17 @@ function App() {
               }}
             />
           )}
-          {page === "Cases" && (
+          {activePage === "Cases" && (
             <Cases
               setNotice={setNotice}
               initialCaseId={requestedCaseId}
               onInitialCaseHandled={() => setRequestedCaseId(null)}
             />
           )}
-          {page === "Billing" && <Billing patient={selectedPatient} />}
-          {page === "Reports" && <Reports />}
-          {page === "User Settings" && <UserManagement />}
-          {page === "Practice Settings" && <PracticeSettings />}
+          {activePage === "Billing" && <Billing patient={selectedPatient} />}
+          {activePage === "Reports" && <Reports />}
+          {activePage === "User Settings" && <UserManagement />}
+          {activePage === "Practice Settings" && <PracticeSettings />}
         </main>
       </div>
       <footer className="status-bar">
@@ -1168,19 +1210,13 @@ function Appointments({
       return;
     }
 
-    void supabase
-      .from("cases")
-      .select("id, case_number, title, status, updated_at")
-      .eq("patient_id", form.patient_id)
-      .in("status", ["open", "in_treatment", "treatment_complete"])
-      .order("updated_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setMessage(error.message);
-          setBookableCases([]);
-          return;
-        }
-        setBookableCases((data ?? []) as ExistingCaseOption[]);
+    void listPatientActiveCases(form.patient_id)
+      .then((data) => setBookableCases(data as ExistingCaseOption[]))
+      .catch((reason) => {
+        setMessage(
+          reason instanceof Error ? reason.message : "Active Cases could not be loaded.",
+        );
+        setBookableCases([]);
       });
   }, [form.patient_id]);
 
@@ -1403,18 +1439,8 @@ function Appointments({
       return;
     }
 
-    const { data, error: caseError } = await supabase
-      .from("cases")
-      .select("id, case_number, title, status, updated_at")
-      .eq("patient_id", item.patient_id)
-      .in("status", ["open", "in_treatment", "treatment_complete"])
-      .order("updated_at", { ascending: false });
-
-    if (caseError) {
-      setMessage(caseError.message);
-      setActivePatientCases([]);
-    } else {
-      const options = (data ?? []) as ExistingCaseOption[];
+    try {
+      const options = (await listPatientActiveCases(item.patient_id)) as ExistingCaseOption[];
       setActivePatientCases(options);
       if (!item.case_id && options.length) {
         setCheckInDraft((current) => ({
@@ -1423,6 +1449,11 @@ function Appointments({
           existingCaseId: options[0].id,
         }));
       }
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Active Cases could not be loaded.",
+      );
+      setActivePatientCases([]);
     }
 
     setCheckInCasesLoading(false);
@@ -1705,14 +1736,16 @@ function Appointments({
                         >
                           Handover to dentist
                         </button>
-                        <button
-                          type="button"
-                          className="classic-button primary"
-                          onClick={() => onOpenCase(item.case_id)}
-                          disabled={!item.case_id}
-                        >
-                          Open Case
-                        </button>
+                        {viewerProfile.role !== "receptionist" && (
+                          <button
+                            type="button"
+                            className="classic-button primary"
+                            onClick={() => onOpenCase(item.case_id)}
+                            disabled={!item.case_id}
+                          >
+                            Open Case
+                          </button>
+                        )}
                         {canDeleteAppointment(item) && (
                           <button
                             type="button"
@@ -1997,14 +2030,16 @@ function Appointments({
                   >
                     Handover to dentist
                   </button>
-                  <button
-                    type="button"
-                    className="classic-button primary"
-                    onClick={() => onOpenCase(selectedAppointment.case_id)}
-                    disabled={!selectedAppointment.case_id}
-                  >
-                    Open Case
-                  </button>
+                  {viewerProfile.role !== "receptionist" && (
+                    <button
+                      type="button"
+                      className="classic-button primary"
+                      onClick={() => onOpenCase(selectedAppointment.case_id)}
+                      disabled={!selectedAppointment.case_id}
+                    >
+                      Open Case
+                    </button>
+                  )}
                 </div>
               </div>
 
