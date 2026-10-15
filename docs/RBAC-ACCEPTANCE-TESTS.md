@@ -6,22 +6,24 @@ Apply `supabase/migrations/20261015000000_role_based_access_control.sql` before 
 
 | Role | Dashboard | Patients | Appointments | Cases | Billing | User Settings |
 | --- | --- | --- | --- | --- | --- | --- |
-| Receptionist | No | No | Yes | No | Yes | No |
+| Receptionist | Yes | No | Yes | No | Yes | No |
 | Dentist | Yes | Yes | Yes | Yes | Yes | No |
 | System Administrator | Yes | Yes | Yes | Yes | Yes | Yes |
 
 ## Receptionist
 
 1. Sign in with an active receptionist profile.
-2. Confirm the sidebar shows only **Appointments** and **Billing**.
-3. Confirm the initial page is **Appointments**, not Dashboard.
-4. Confirm **Tools / User Settings** is not shown.
-5. Book an appointment and confirm patient and dentist selectors still work.
-6. Link a follow-up appointment to an active Case and confirm the Case selector works inside the appointment workflow.
-7. Check in a patient and hand the appointment over to the assigned dentist.
-8. Confirm there is no **Open Case** action in the receptionist appointment view.
-9. Open Billing and confirm pending/paid invoices can be viewed and payments can be recorded.
-10. Attempt direct table access as the receptionist:
+2. Confirm the sidebar shows **Dashboard, Appointments, Billing** only.
+3. Confirm the initial page is **Dashboard**.
+4. Confirm the receptionist Dashboard shows appointment and billing workload, but does not show clinical Case, task, or recall metrics.
+5. Confirm Dashboard actions only open Appointments or Billing.
+6. Confirm **Tools / User Settings** is not shown.
+7. Book an appointment and confirm patient and dentist selectors still work.
+8. Link a follow-up appointment to an active Case and confirm the Case selector works inside the appointment workflow.
+9. Check in a patient and hand the appointment over to the assigned dentist.
+10. Confirm there is no **Open Case** action in the receptionist appointment view.
+11. Open Billing and confirm pending/paid invoices can be viewed and payments can be recorded.
+12. Attempt direct table access as the receptionist:
     - Patient create/update/delete must be denied.
     - Cases, clinical notes, treatments, treatment plans, Case tasks, recalls, Case events, and Case assignments must be denied.
     - Appointments and invoice reads must remain available.
