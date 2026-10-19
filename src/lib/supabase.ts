@@ -108,6 +108,18 @@ export type PortalInvoice = {
   status: string
 }
 
+export type PortalReceipt = {
+  id: string
+  receipt_number: string
+  invoice_number: string
+  issued_at: string
+  amount: number
+  invoice_total: number
+  amount_paid_after: number
+  balance_after: number
+  payment_method: string | null
+}
+
 export type PortalContext = {
   session_token: string
   patient_id: string
@@ -182,7 +194,7 @@ export async function getPatientPortalData(sessionToken: string) {
   const client = requireSupabase()
   const { data, error } = await client.rpc('get_patient_portal_data', { p_session_token: sessionToken })
   if (error) throw new Error('This portal session has expired. Request a new link.')
-  return data as { patient_id: string; patient_name: string; invoices: PortalInvoice[]; documents: Array<{ id: string; file_name: string; content_type: string; storage_path: string; uploaded_at: string }>; bank: { bank_name: string | null; account_name: string | null; account_number: string | null } | null }
+  return data as { patient_id: string; patient_name: string; invoices: PortalInvoice[]; receipts: PortalReceipt[]; documents: Array<{ id: string; file_name: string; content_type: string; storage_path: string; uploaded_at: string }>; bank: { bank_name: string | null; account_name: string | null; account_number: string | null } | null }
 }
 
 export async function uploadPatientPortalFile(

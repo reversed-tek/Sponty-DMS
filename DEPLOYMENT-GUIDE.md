@@ -384,3 +384,107 @@ Calendar sync must never be the only persistence path for an appointment.
 - [ ] Production host serves SPA fallback routes
 - [ ] Print layouts verified
 - [ ] Outlook consent and failure paths tested if enabled
+
+
+## 18. Automatic Payment Receipt Email Delivery (PR #16)
+
+> Unlike the previous manual Outlook **Send receipt** button, this is an
+> unattended, server-side Microsoft Graph email service. No receptionist
+> needs to be signed in for delivery.
+
+### First: deploy schema, not production messages
+
+1. Apply these migrations in order in the Supabase SQL Editor:
+   - `supabase/migrations/20261020000000_automatic_payment_receipts.sql`
+   - `supabase/migrations/20261020000001_receipt_email_delivery.sql`
+2. Confirm that `payment_receipts`, `receipt_email_deliveries`, and the
+   `payment_receipts_queue_email` trigger exist. Every new partial or final
+   payment will create an issued receipt and an email job, but no email will
+   leave until the background dispatcher is enabled.
+3. **Review the queued jobs** before enabling Cron, especially if the first
+   migration was already deployed and genuine receipts have accumulated.
+
+### Configure Microsoft Graph application mail permissions
+
+The worker uses the same Microsoft Graph *application* authentication pattern
+as `patient-portal-upload`, not the staff's delegated Outlook session.
+
+1. In Entra ID, ensure the intended app registration has Microsoft Graph
+   **Application** permission `Mail.Send`, and grant admin consent.
+2. Choose the dedicated clinic sender mailbox and restrict the application's
+   mailbox access using supported Exchange Online application RBAC where available.
+3. In Supabase **Edge Functions → Secrets**, set:
+   - `MICROSOFT_TENANT_ID`
+   - `MICROSOFT_CLIENT_ID`
+   - `MICROSOFT_CLIENT_SECRET`
+   - `MICROSOFT_GRAPH_SENDER` (the allowed clinic sender address)
+   - `RECEIPT_DISPATCH_SECRET` (a fresh unpredictable secret of at least 32 characters)
+
+Do **not** put client secrets, the dispatch secret, or the service-role key in
+`VITE_` variables, the repo or browser source. The Supabase runtime provides
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` for this Edge Function.
+
+### Deploy the receipt dispatcher
+
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+supabase functions deploy send-receipt-emails --no-verify-jwt
+```
+
+This function **requires** the `x-receipt-dispatch-secret` request header and
+rejects unauthenticated calls with HTTP 401. JWT checking must be disabled to
+allow the internal Cron job's secret-authenticated call; it is not a public
+user API. `supabase/config.toml` also defines `verify_jwt = false`.
+
+### Start the scheduled dispatcher
+
+1. Enable `pg_cron` and `pg_net` in Supabase **Database → Extensions**.
+2. Open **Vault** in the Supabase Dashboard and store:
+   - `sponty_receipt_project_url` → `https://YOUR_PROJECT_REF.supabase.co`
+   - `sponty_receipt_dispatch_secret` → the exact same value used for
+     `RECEIPT_DISPATCH_SECRET` in the Edge Function.
+3. Run `supabase/receipt-email-cron-setup.sql` from the Supabase SQL Editor.
+   The Cron job calls the Edge Function every minute, passing the secret from
+   Vault, and never includes it in source control.
+4. Verify:
+   - Supabase **Cron → Jobs** has `sponty-send-payment-receipts` enabled;
+   - **Edge Functions → send-receipt-emails → Logs** shows successful invocations;
+   - `receipt_email_deliveries` changes from `pending` to `sent`.
+
+### Confirm the end-to-end workflow
+
+Complete a test visit to generate an invoice, enter a partial payment in Billing
+and check that a unique receipt appears in the patient's verified portal. Within
+the next scheduled dispatch run (normally about one minute), an HTML receipt
+email should be accepted by Graph for delivery to the patient's registered
+address. Finish paying the invoice and confirm a **second** receipt/email for
+the final payment, without duplicating the first.
+
+The SMTP/Graph acceptance status does not prove delivery into the patient's
+inbox; check message trace if the patient says nothing arrived. No PDF is
+attached to the email; the patient portal offers **Print / Save PDF**.
+
+### Monitoring and exceptions
+
+```sql
+select r.receipt_number, d.recipient_email, d.status, d.attempt_count,
+       d.next_attempt_at, d.sent_at, d.last_error
+from public.receipt_email_deliveries d
+join public.payment_receipts r on r.id = d.receipt_id
+order by d.created_at desc
+limit 50;
+```
+
+- `missing_email`: no valid patient email at receipt issuance. Fix the patient
+  record, review the destination address, and manually requeue when approved.
+- `pending`: waiting on Cron or scheduled retry.
+- `processing`: claimed briefly by an Edge worker, with a recovery lease.
+- `sent`: Microsoft Graph accepted the message (typically HTTP 202).
+- `failed`: permanent error or five unsuccessful attempts; investigate Graph
+  permissions, sender restriction, invalid recipients and service logs.
+
+Sending never changes whether a payment is completed. Jobs are unique per
+receipt, and ordinary retries avoid duplicates. Exact-once transmission cannot
+be guaranteed after rare process crashes between Graph accepting a message and
+the worker persisting `sent`; staff should investigate repeated sends using
+the receipt number. Historical paid invoices are not automatically backfilled.

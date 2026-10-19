@@ -1,0 +1,4 @@
+# The receipt dispatcher is called by an internal Supabase Cron job, not by users.
+# It validates the independent RECEIPT_DISPATCH_SECRET request header.
+[functions.send-receipt-emails]
+verify_jwt = false
