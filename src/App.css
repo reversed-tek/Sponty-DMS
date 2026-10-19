@@ -235,6 +235,12 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 .appointment-workflow-card small {
   color: #52667b;
 }
+/* Place check-in above Appointment Details (z-index: 20), while keeping
+   workflow confirmations (z-index: 35) in front of both dialogs. */
+.check-in-case-backdrop {
+  z-index: 30;
+}
+
 .workflow-confirmation-backdrop {
   z-index: 35;
 }
