@@ -178,16 +178,17 @@ async function findDentistAvailabilityConflict(
     throw new Error("Enter a valid appointment date, time and duration.");
   }
 
-  // The maximum duration is eight hours, so include yesterday for slots
-  // extending across midnight.
-  const dayBefore = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000)
-    .toISOString().slice(0, 10);
+  // The database allows up to eight-hour visits. Include both adjacent
+  // dates to catch existing or requested appointments spanning midnight.
+  const dateBase = Date.parse(`${date}T00:00:00Z`);
+  const dayBefore = new Date(dateBase - 86_400_000).toISOString().slice(0, 10);
+  const dayAfter = new Date(dateBase + 86_400_000).toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("appointments")
     .select("id, appointment_date, appointment_time, duration_minutes")
     .eq("provider_id", providerId)
     .gte("appointment_date", dayBefore)
-    .lte("appointment_date", date)
+    .lte("appointment_date", dayAfter)
     .in("status", dentistBusyStatuses);
 
   if (error) throw new Error(`Could not check dentist availability: ${error.message}`);
