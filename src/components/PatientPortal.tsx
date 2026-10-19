@@ -337,10 +337,10 @@ export function PatientPortal({ token }: PatientPortalProps) {
 
           <section className="portal-panel portal-receipts-panel">
             <div className="panel-title">Payment Receipts</div>
-            {data.receipts.length === 0 ? (
+            {(data.receipts ?? []).length === 0 ? (
               <p className="empty-state">No issued payment receipts yet.</p>
             ) : (
-              data.receipts.map((receipt) => (
+              (data.receipts ?? []).map((receipt) => (
                 <article className="portal-receipt-row" key={receipt.id}>
                   <div>
                     <strong>{receipt.receipt_number}</strong>
