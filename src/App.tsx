@@ -1813,7 +1813,7 @@ function Appointments({
       {!loading && !items.length && <div className="empty-state">No appointments found. Use <strong>+ New Appointment</strong> to schedule the first visit.</div>}
 
       {checkInTarget && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop check-in-case-backdrop">
           <section className="classic-dialog check-in-case-dialog" role="dialog" aria-modal="true">
             <div className="dialog-title">
               Check In &amp; Select Case
