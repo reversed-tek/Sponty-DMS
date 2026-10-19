@@ -144,6 +144,64 @@ const appointmentStatusLabel = (status: string) =>
               ? "Confirmed"
               : "Scheduled";
 
+type DentistAvailabilityConflict = {
+  id: string;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+};
+
+const dentistBusyStatuses = ["scheduled", "booked", "confirmed", "in_progress", "completed"];
+const dentistConflictMessage =
+  "This dentist already has an appointment during the selected time. Choose another date, time, or dentist.";
+
+const describeAppointmentConflict = (error: { code?: string; message: string }) =>
+  error.code === "23P01" || error.message.includes("dentist_appointment_time_conflict")
+    ? dentistConflictMessage
+    : error.message;
+
+const appointmentSlotStart = (date: string, time: string) =>
+  Date.parse(`${date}T${time.length === 5 ? `${time}:00` : time}Z`);
+
+// Preflight provides friendly feedback; the database trigger prevents races.
+async function findDentistAvailabilityConflict(
+  providerId: string,
+  date: string,
+  time: string,
+  durationMinutes: number,
+  excludedAppointmentId?: string,
+): Promise<DentistAvailabilityConflict | null> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const requestedStart = appointmentSlotStart(date, time);
+  const requestedEnd = requestedStart + durationMinutes * 60_000;
+  if (!Number.isFinite(requestedStart) || !Number.isFinite(requestedEnd) || durationMinutes <= 0) {
+    throw new Error("Enter a valid appointment date, time and duration.");
+  }
+
+  // The maximum duration is eight hours, so include yesterday for slots
+  // extending across midnight.
+  const dayBefore = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000)
+    .toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("id, appointment_date, appointment_time, duration_minutes")
+    .eq("provider_id", providerId)
+    .gte("appointment_date", dayBefore)
+    .lte("appointment_date", date)
+    .in("status", dentistBusyStatuses);
+
+  if (error) throw new Error(`Could not check dentist availability: ${error.message}`);
+
+  return (
+    (data ?? []).find((other) => {
+      if (other.id === excludedAppointmentId) return false;
+      const otherStart = appointmentSlotStart(other.appointment_date, other.appointment_time);
+      const otherEnd = otherStart + other.duration_minutes * 60_000;
+      return otherStart < requestedEnd && otherEnd > requestedStart;
+    }) ?? null
+  );
+}
+
 function App() {
   const [page, setPage] = useState<Page>("Dashboard");
   const [sessionUser, setSessionUser] = useState<{
@@ -1175,6 +1233,10 @@ function Appointments({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [detailError, setDetailError] = useState("");
+  const [detailsSaving, setDetailsSaving] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [detailDraft, setDetailDraft] = useState({ reason: "", notes: "", providerId: "" });
   const [checkInTarget, setCheckInTarget] = useState<Appointment | null>(null);
@@ -1209,6 +1271,10 @@ function Appointments({
     appointment_type: "checkup",
     reason: "",
   });
+  useEffect(() => {
+    setBookingError("");
+  }, [form.provider_id, form.appointment_date, form.appointment_time, form.duration_minutes]);
+
   useEffect(() => {
     if (!supabase || !form.patient_id) {
       setBookableCases([]);
@@ -1348,53 +1414,73 @@ function Appointments({
   }, [providers, viewerProfile.id]);
 
   async function addAppointment() {
-    if (!supabase || !form.patient_id || !form.provider_id || !form.appointment_date) return;
-    const { data: auth } = await supabase.auth.getUser();
-    const { data, error: insertError } = await supabase
-      .from("appointments")
-      .insert({
-        ...form,
-        case_id: form.case_id || null,
-        duration_minutes: Number(form.duration_minutes),
-        provider_id: form.provider_id,
-        created_by: auth.user?.id,
-      })
-      .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, case_id, patients(first_name, last_name)")
-      .single();
-
-    if (insertError) {
-      setMessage(insertError.message);
-      return;
-    }
-
-    if (data) {
-      const patient = data.patients as unknown as { first_name: string; last_name: string } | null;
-      const provider = providers.find((candidate) => candidate.id === data.provider_id);
-      setItems((current) => [{
-        ...data,
-        provider_id: data.provider_id ?? null,
-        patient_name: patient ? `${patient.first_name} ${patient.last_name}` : "Unknown patient",
-        provider_name: provider?.full_name ?? "Unassigned",
-        notes: data.notes ?? null,
-      } as Appointment, ...current]);
-      setShowForm(false);
-      setForm({
-        patient_id: "",
-        provider_id: "",
-        case_id: "",
-        appointment_date: "",
-        appointment_time: "08:00",
-        duration_minutes: "30",
-        appointment_type: "checkup",
-        reason: "",
-      });
-      setNotice(
-        data.case_id
-          ? "Follow-up appointment booked and linked to the Case."
-          : "Appointment saved to Supabase",
+    if (!supabase || !form.patient_id || !form.provider_id || !form.appointment_date || bookingSaving) return;
+    setBookingError("");
+    setBookingSaving(true);
+    try {
+      const conflict = await findDentistAvailabilityConflict(
+        form.provider_id, form.appointment_date, form.appointment_time,
+        Number(form.duration_minutes),
       );
+      if (conflict) {
+        setBookingError(
+          `This dentist already has an appointment on ${conflict.appointment_date} at ${conflict.appointment_time.slice(0, 5)} for ${conflict.duration_minutes} minutes. Choose another date, time, or dentist.`,
+        );
+        return;
+      }
+
+      const { data: auth } = await supabase.auth.getUser();
+      const { data, error: insertError } = await supabase
+        .from("appointments")
+        .insert({
+          ...form,
+          case_id: form.case_id || null,
+          duration_minutes: Number(form.duration_minutes),
+          provider_id: form.provider_id,
+          created_by: auth.user?.id,
+        })
+        .select("id, patient_id, provider_id, appointment_date, appointment_time, duration_minutes, appointment_type, status, reason, notes, outlook_event_id, checked_in_at, handed_over_at, clinical_updated_at, treatment_completed_at, case_id, patients(first_name, last_name)")
+        .single();
+
+      if (insertError) {
+        setBookingError(describeAppointmentConflict(insertError));
+        return;
+      }
+
+      if (data) {
+        const patient = data.patients as unknown as { first_name: string; last_name: string } | null;
+        const provider = providers.find((candidate) => candidate.id === data.provider_id);
+        setItems((current) => [{
+          ...data,
+          provider_id: data.provider_id ?? null,
+          patient_name: patient ? `${patient.first_name} ${patient.last_name}` : "Unknown patient",
+          provider_name: provider?.full_name ?? "Unassigned",
+          notes: data.notes ?? null,
+        } as Appointment, ...current]);
+        setShowForm(false);
+        setForm({
+          patient_id: "",
+          provider_id: "",
+          case_id: "",
+          appointment_date: "",
+          appointment_time: "08:00",
+          duration_minutes: "30",
+          appointment_type: "checkup",
+          reason: "",
+        });
+        setNotice(
+          data.case_id
+            ? "Follow-up appointment booked and linked to the Case."
+            : "Appointment saved to Supabase",
+        );
+      }
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : "Appointment could not be saved.");
+    } finally {
+      setBookingSaving(false);
     }
   }
+
   async function sync(item: Appointment) {
     try {
       const event = await createCalendarEvent({
@@ -1591,48 +1677,65 @@ function Appointments({
   }
 
   async function saveAppointmentDetails() {
-    if (!supabase || !selectedAppointmentId) return;
-
+    if (!supabase || !selectedAppointmentId || detailsSaving) return;
+    setDetailError("");
+    setDetailsSaving(true);
     const reason = detailDraft.reason.trim();
     const notes = detailDraft.notes.trim();
     const providerId = detailDraft.providerId || null;
+    try {
+      if (providerId && selectedAppointment && providerId !== selectedAppointment.provider_id) {
+        const conflict = await findDentistAvailabilityConflict(
+          providerId, selectedAppointment.appointment_date,
+          selectedAppointment.appointment_time, selectedAppointment.duration_minutes,
+          selectedAppointment.id,
+        );
+        if (conflict) {
+          setDetailError(dentistConflictMessage);
+          return;
+        }
+      }
+      const { error } = await supabase
+        .from("appointments")
+        .update({
+          reason: reason || null,
+          notes: notes || null,
+          provider_id: providerId,
+        })
+        .eq("id", selectedAppointmentId);
 
-    const { error } = await supabase
-      .from("appointments")
-      .update({
-        reason: reason || null,
-        notes: notes || null,
-        provider_id: providerId,
-      })
-      .eq("id", selectedAppointmentId);
+      if (error) {
+        setDetailError(describeAppointmentConflict(error));
+        return;
+      }
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      const providerName = providers.find((candidate) => candidate.id === providerId)?.full_name ?? "Unassigned";
+      setItems((current) =>
+        current.map((appointment) =>
+          appointment.id === selectedAppointmentId
+            ? {
+                ...appointment,
+                reason: reason || null,
+                notes: notes || null,
+                provider_id: providerId,
+                provider_name: providerName,
+              }
+            : appointment,
+        ),
+      );
+      setSelectedAppointmentId(null);
+      setDetailDraft({ reason: "", notes: "", providerId: "" });
+      setNotice("Appointment details saved");
+    } catch (error) {
+      setDetailError(error instanceof Error ? error.message : "Appointment details could not be saved.");
+    } finally {
+      setDetailsSaving(false);
     }
-
-    const providerName = providers.find((candidate) => candidate.id === providerId)?.full_name ?? "Unassigned";
-    setItems((current) =>
-      current.map((appointment) =>
-        appointment.id === selectedAppointmentId
-          ? {
-              ...appointment,
-              reason: reason || null,
-              notes: notes || null,
-              provider_id: providerId,
-              provider_name: providerName,
-            }
-          : appointment,
-      ),
-    );
-    setSelectedAppointmentId(null);
-    setDetailDraft({ reason: "", notes: "", providerId: "" });
-    setNotice("Appointment details saved");
   }
 
   return (
     <section className="panel">
-      <div className="panel-title">Appointment Calendar <button type="button" className="classic-button primary" onClick={() => setShowForm(true)}>+ New Appointment</button></div>
+      <div className="panel-title">Appointment Calendar <button type="button" className="classic-button primary" onClick={() => { setBookingError(""); setShowForm(true); }}>+ New Appointment</button></div>
       {message && <p className="send-error">{message}</p>}
       {loading ? (
         <div className="empty-state">Loading appointments...</div>
@@ -1706,6 +1809,7 @@ function Appointments({
                         className="classic-button"
                         onClick={() => {
                           setSelectedAppointmentId(item.id);
+                          setDetailError("");
                           setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "", providerId: item.provider_id ?? "" });
                         }}
                       >
@@ -1797,6 +1901,7 @@ function Appointments({
                         className="classic-button"
                         onClick={() => {
                           setSelectedAppointmentId(item.id);
+                          setDetailError("");
                           setDetailDraft({ reason: item.reason ?? "", notes: item.notes ?? "", providerId: item.provider_id ?? "" });
                         }}
                       >
@@ -2052,9 +2157,10 @@ function Appointments({
                 Assigned dentist
                 <select
                   value={detailDraft.providerId}
-                  onChange={(event) =>
-                    setDetailDraft((current) => ({ ...current, providerId: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setDetailError("");
+                    setDetailDraft((current) => ({ ...current, providerId: event.target.value }));
+                  }}
                 >
                   <option value="">Select dentist</option>
                   {providers.map((provider) => (
@@ -2084,6 +2190,7 @@ function Appointments({
                 />
               </label>
 
+              {detailError && <p className="send-error" role="alert">{detailError}</p>}
               <div className="dialog-actions">
                 {canDeleteAppointment(selectedAppointment) && (
                   <button
@@ -2097,8 +2204,8 @@ function Appointments({
                 <button type="button" className="classic-button" onClick={() => setSelectedAppointmentId(null)}>
                   Close
                 </button>
-                <button type="button" className="classic-button primary" onClick={saveAppointmentDetails}>
-                  Save details
+                <button type="button" className="classic-button primary" disabled={detailsSaving} onClick={saveAppointmentDetails}>
+                  {detailsSaving ? "Saving..." : "Save details"}
                 </button>
               </div>
             </div>
@@ -2138,7 +2245,7 @@ function Appointments({
     </select>
     <small>Link follow-up visits now so Case scheduling tasks close immediately.</small>
   </label>
-)}<label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label><div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={!form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>Save Appointment</button></div></div></section></div>}
+)}<label>Dentist<select value={form.provider_id} onChange={(event) => setForm({ ...form, provider_id: event.target.value })}><option value="">Select dentist</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name}</option>)}</select></label><label>Date<input type="date" value={form.appointment_date} onChange={(event) => setForm({ ...form, appointment_date: event.target.value })} /></label><label>Time<input type="time" value={form.appointment_time} onChange={(event) => setForm({ ...form, appointment_time: event.target.value })} /></label><label>Duration<select value={form.duration_minutes} onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label>Appointment type<select value={form.appointment_type} onChange={(event) => setForm({ ...form, appointment_type: event.target.value })}><option value="checkup">Checkup</option><option value="cleaning">Cleaning</option><option value="filling">Filling</option><option value="extraction">Extraction</option><option value="consultation">Consultation</option><option value="emergency">Emergency</option></select></label><label>Reason<input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></label>{bookingError && <p className="send-error" role="alert">{bookingError}</p>}<div className="dialog-actions"><button type="button" className="classic-button" onClick={() => setShowForm(false)}>Cancel</button><button type="button" className="classic-button primary" disabled={bookingSaving || !form.patient_id || !form.provider_id || !form.appointment_date} onClick={addAppointment}>{bookingSaving ? "Checking availability..." : "Save Appointment"}</button></div></div></section></div>
     </section>
   );
 }
