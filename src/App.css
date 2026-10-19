@@ -1989,3 +1989,43 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     min-height: 100dvh;
   }
 }
+
+
+/* Issued payment receipts are separate from patient-uploaded transfer proofs. */
+.portal-receipt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-top: 1px solid #b3bdc8;
+}
+.portal-receipt-row small { display: block; margin-top: 4px; color: #556372; }
+.portal-receipt-row .classic-button { white-space: nowrap; }
+.portal-receipt-backdrop { z-index: 60; }
+.portal-receipt-dialog { width: min(570px, 94vw); }
+.portal-receipt-sheet { padding: 24px; background: #fff; color: #111; }
+.portal-receipt-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 16px; border-bottom: 2px solid #005a9e; }
+.portal-receipt-heading h2 { margin: 0; font-size: 19px; color: #005a9e; }
+.portal-receipt-details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+.portal-receipt-details dt { color: #586675; }
+.portal-receipt-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.portal-receipt-note { margin: 0; line-height: 1.5; color: #465566; }
+.portal-receipt-actions { margin: 0; padding: 14px; border-top: 1px solid #a8b1ba; }
+
+@media (max-width: 700px) {
+  .portal-receipt-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .portal-receipt-row .classic-button { grid-column: 1 / -1; justify-self: start; }
+  .portal-receipt-heading { flex-direction: column; }
+}
+
+@media print {
+  @page { margin: 18mm; }
+  .portal-screen { min-height: 0; padding: 0; background: #fff; }
+  .portal-window { max-width: none; min-height: 0; border: 0; box-shadow: none; background: #fff; }
+  .portal-window > :not(.portal-receipt-backdrop) { display: none !important; }
+  .portal-receipt-backdrop { position: static; inset: auto; display: block; padding: 0; background: none; }
+  .portal-receipt-dialog { width: 100%; max-height: none; overflow: visible; border: 0; box-shadow: none; background: #fff; }
+  .portal-receipt-modal-title, .portal-receipt-actions { display: none !important; }
+  .portal-receipt-sheet { padding: 0; }
+}
