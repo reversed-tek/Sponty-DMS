@@ -5,7 +5,7 @@ import {
   uploadPatientPortalFile,
   verifyPatientPortalAccess,
 } from "../lib/supabase";
-import type { PortalContext, PortalInvoice } from "../lib/supabase";
+import type { PortalContext, PortalInvoice, PortalReceipt } from "../lib/supabase";
 
 type PatientPortalProps = { token: string };
 type PortalData = Awaited<ReturnType<typeof getPatientPortalData>>;
@@ -109,6 +109,7 @@ export function PatientPortal({ token }: PatientPortalProps) {
   const [loading, setLoading] = useState(true);
   const [uploadingInvoice, setUploadingInvoice] = useState<string | null>(null);
   const [proofMessage, setProofMessage] = useState("");
+  const [selectedReceipt, setSelectedReceipt] = useState<PortalReceipt | null>(null);
 
   const storageKey = `sponty-portal-session:${token}`;
 
@@ -333,6 +334,37 @@ export function PatientPortal({ token }: PatientPortalProps) {
             )}
           </section>
 
+
+          <section className="portal-panel portal-receipts-panel">
+            <div className="panel-title">Payment Receipts</div>
+            {data.receipts.length === 0 ? (
+              <p className="empty-state">No issued payment receipts yet.</p>
+            ) : (
+              data.receipts.map((receipt) => (
+                <article className="portal-receipt-row" key={receipt.id}>
+                  <div>
+                    <strong>{receipt.receipt_number}</strong>
+                    <small>
+                      Invoice {receipt.invoice_number} ·{" "}
+                      {new Date(receipt.issued_at).toLocaleString()}
+                    </small>
+                  </div>
+                  <div>
+                    <strong>{formatMoney(Number(receipt.amount))}</strong>
+                    <small>{Number(receipt.balance_after) === 0 ? "Paid in full" : "Partial payment"}</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="classic-button"
+                    onClick={() => setSelectedReceipt(receipt)}
+                  >
+                    View / Print
+                  </button>
+                </article>
+              ))
+            )}
+          </section>
+
           <fieldset className="portal-bank">
             <legend>Bank Transfer Instructions</legend>
             <p>Use this reference code when making your transfer:</p>
@@ -358,6 +390,63 @@ export function PatientPortal({ token }: PatientPortalProps) {
             onUploaded={() => void refresh(context.session_token)}
           />
         </main>
+
+
+        {selectedReceipt && (
+          <div className="modal-backdrop portal-receipt-backdrop">
+            <section
+              className="classic-dialog portal-receipt-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Payment receipt ${selectedReceipt.receipt_number}`}
+            >
+              <div className="dialog-title portal-receipt-modal-title">
+                {selectedReceipt.receipt_number}
+                <button type="button" onClick={() => setSelectedReceipt(null)}>X</button>
+              </div>
+              <div className="portal-receipt-sheet">
+                <div className="portal-receipt-heading">
+                  <h2>Sponty Dental Services</h2>
+                  <strong>Payment Receipt</strong>
+                </div>
+                <dl className="portal-receipt-details">
+                  <dt>Receipt number</dt>
+                  <dd>{selectedReceipt.receipt_number}</dd>
+                  <dt>Issued on</dt>
+                  <dd>{new Date(selectedReceipt.issued_at).toLocaleString()}</dd>
+                  <dt>Patient</dt>
+                  <dd>{data.patient_name}</dd>
+                  <dt>Invoice</dt>
+                  <dd>{selectedReceipt.invoice_number}</dd>
+                  <dt>Amount received</dt>
+                  <dd><strong>{formatMoney(Number(selectedReceipt.amount))}</strong></dd>
+                  <dt>Invoice total</dt>
+                  <dd>{formatMoney(Number(selectedReceipt.invoice_total))}</dd>
+                  <dt>Total paid to date</dt>
+                  <dd>{formatMoney(Number(selectedReceipt.amount_paid_after))}</dd>
+                  <dt>Remaining balance</dt>
+                  <dd>{formatMoney(Number(selectedReceipt.balance_after))}</dd>
+                  <dt>Payment method</dt>
+                  <dd>{selectedReceipt.payment_method || "Not specified"}</dd>
+                </dl>
+                <p className="portal-receipt-note">
+                  This receipt acknowledges the payment amount shown above.
+                  {Number(selectedReceipt.balance_after) > 0
+                    ? " The remaining invoice balance is still outstanding."
+                    : " The invoice is fully paid."}
+                </p>
+              </div>
+              <div className="dialog-actions portal-receipt-actions">
+                <button type="button" className="classic-button" onClick={() => setSelectedReceipt(null)}>
+                  Close
+                </button>
+                <button type="button" className="classic-button primary" onClick={() => window.print()}>
+                  Print / Save PDF
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
 
         <footer className="status-bar">
           <span className="status-panel">Secure verified portal session active</span>
