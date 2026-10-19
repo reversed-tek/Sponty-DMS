@@ -156,7 +156,6 @@ function App() {
   const [notice, setNotice] = useState("Ready");
   const [signInError, setSignInError] = useState("");
   const [, setError] = useState("");
-  const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [requestedCaseId, setRequestedCaseId] = useState<string | null>(null);
 
@@ -328,18 +327,6 @@ function App() {
         )}
         <button type="button" onClick={() => setNotice("Use the sidebar to open a module")}>Help</button>
       </div>
-      {canAccessPage(profile.role, "Patients") && (
-        <div className="toolbar">
-          <label className="quick-search">
-            Quick Find:{" "}
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="patient name or number"
-            />
-          </label>
-        </div>
-      )}
       <div className="workspace">
         <aside className="sidebar">
           <div className="sidebar-heading">Practice Menu</div>
@@ -373,7 +360,6 @@ function App() {
           {activePage === "Dashboard" && <Dashboard navigate={navigate} />}
           {activePage === "Patients" && (
             <Patients
-              search={search}
               selected={selectedPatient}
               setSelected={setSelectedPatient}
               setNotice={setNotice}
@@ -416,19 +402,18 @@ function App() {
 }
 
 function Patients({
-  search,
   selected,
   setSelected,
   setNotice,
   onOpenCase,
 }: {
-  search: string;
   selected: Patient | null;
   setSelected: (patient: Patient | null) => void;
   setNotice: (message: string) => void;
   onOpenCase: (caseId: string) => void;
 }) {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -618,7 +603,7 @@ function Patients({
       patients.filter((patient) =>
         `${patient.first_name} ${patient.last_name} ${patient.patient_number} ${patient.phone ?? ""}`
           .toLowerCase()
-          .includes(search.toLowerCase()),
+          .includes(search.trim().toLowerCase()),
       ),
     [patients, search],
   );
@@ -810,8 +795,14 @@ function Patients({
         </div>
         <div className="filter-row">
           <label>
-            Search{" "}
-            <input value={search} readOnly placeholder="Use Quick Find above" />
+            Search
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Patient name, number or phone"
+              aria-label="Search patients"
+            />
           </label>
         </div>
         {error && <p className="send-error">{error}</p>}
