@@ -154,6 +154,7 @@ function App() {
   const [profileError, setProfileError] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [notice, setNotice] = useState("Ready");
+  const [signInError, setSignInError] = useState("");
   const [, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -222,23 +223,28 @@ function App() {
               <button
                 type="button"
                 className="classic-button primary"
-                onClick={() =>
+                onClick={() => {
+                  setSignInError("");
                   signInWithMicrosoft().catch((error) =>
-                    setNotice(error.message),
-                  )
-                }
+                    setSignInError(
+                      error instanceof Error ? error.message : "Microsoft sign-in failed.",
+                    ),
+                  );
+                }}
               >
                 Sign in with Microsoft
               </button>
             )}
-            <button
-              type="button"
-              className="classic-button"
-              onClick={() => signOut()}
-            >
-              Sign out
-            </button>
-            <p className="send-error">{notice}</p>
+            {sessionUser && (
+              <button
+                type="button"
+                className="classic-button"
+                onClick={() => signOut()}
+              >
+                Sign out
+              </button>
+            )}
+            {signInError && <p className="send-error">{signInError}</p>}
           </div>
         </section>
       </div>

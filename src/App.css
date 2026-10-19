@@ -1968,3 +1968,18 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     height: 26px;
   }
 }
+
+/* Center the authentication screen without affecting the main application layout. */
+.auth-screen {
+  min-height: calc(100vh - 36px);
+  min-height: calc(100dvh - 36px);
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 800px) {
+  .auth-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
