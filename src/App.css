@@ -913,7 +913,7 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
   color: #5b6d7f;
 }
 
-/* Appointment workflow indicator */
+/* Appointment workflow: compact, readable stage chips in list and modal. */
 .appointment-row {
   grid-template-columns: 135px minmax(240px, 1fr) auto auto auto;
 }
@@ -924,66 +924,77 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
 
 .appointment-progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0;
-  margin-top: 5px;
-  overflow-x: auto;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .appointment-progress-step {
-  position: relative;
-  min-width: 76px;
-  display: flex;
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 4px;
-  color: #718096;
-  font-size: 10px;
+  gap: 6px;
+  min-height: 27px;
+  padding: 3px 8px 3px 5px;
+  border: 1px solid #c8d1da;
+  border-radius: 3px;
+  background: #f3f5f7;
+  color: #586779;
+  font-size: 11px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
-.appointment-progress-step:not(:last-child)::after {
-  content: "";
-  width: 18px;
-  height: 2px;
-  margin: 0 4px;
-  background: #c8d2dc;
-}
-
-.appointment-progress-dot {
+/* Override general .appointment-block span / .appointment-workflow-card span
+   styles so the numbered circles keep their intended alignment and colors. */
+.appointment-progress .appointment-progress-dot {
+  display: inline-grid;
+  flex: 0 0 18px;
   width: 18px;
   height: 18px;
-  flex: 0 0 18px;
-  display: grid;
+  box-sizing: border-box;
   place-items: center;
+  border: 1px solid #b8c4cf;
   border-radius: 50%;
   background: #e4e9ef;
   color: #566575;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.appointment-progress .appointment-progress-label {
+  display: inline;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .appointment-progress-step.done {
-  color: #285b3b;
+  border-color: #a9d3b5;
+  background: #eaf7ee;
+  color: #276141;
 }
 
 .appointment-progress-step.done .appointment-progress-dot {
-  background: #dff5e8;
+  border-color: #65a978;
+  background: #d2efda;
   color: #1d6b3d;
-  border: 1px solid #65a978;
-}
-
-.appointment-progress-step.done:not(:last-child)::after {
-  background: #65a978;
 }
 
 .appointment-progress-step.current {
+  border-color: #76a7dc;
+  background: #e4f1ff;
   color: #174b7a;
-  font-weight: 700;
 }
 
 .appointment-progress-step.current .appointment-progress-dot {
-  color: #fff;
+  border-color: var(--brand-blue);
   background: var(--brand-blue);
+  color: #fff;
 }
 
 /* Patient record: cases are the link into the clinical workspace */
@@ -1624,14 +1635,6 @@ input, select { min-height: 23px; padding: 2px 5px; background: #fff; border: 2p
     grid-template-columns: 1fr;
   }
 
-  .appointment-progress {
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-
-  .appointment-progress-step:not(:last-child)::after {
-    display: none;
-  }
 }
 
 
