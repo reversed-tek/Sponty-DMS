@@ -5,46 +5,50 @@ type AppointmentProgressProps = {
   treatmentCompletedAt: string | null;
 };
 
-const stepState = (
-  step: "scheduled" | "checked_in" | "handover" | "complete",
-  props: AppointmentProgressProps,
-) => {
-  const completed = props.status === "completed" || Boolean(props.treatmentCompletedAt);
+type WorkflowStep = "scheduled" | "checked_in" | "handover" | "complete";
+type WorkflowStepState = "done" | "current" | "pending";
 
-  if (step === "scheduled") return "done";
-  if (step === "checked_in") {
-    return props.checkedInAt || props.handedOverAt || completed ? "done" : "current";
-  }
-  if (step === "handover") {
-    if (props.handedOverAt || completed) return "done";
-    return props.checkedInAt ? "current" : "pending";
-  }
+// Highlight the most recent stage reached, not the next action to take.
+// Existing appointments may lack timestamps, so fall back to their status.
+// Completing treatments alone does not mean the visit is complete.
+const stepState = (step: WorkflowStep, props: AppointmentProgressProps): WorkflowStepState => {
+  const completed = props.status === "completed";
+  const handedOver = Boolean(props.handedOverAt) || props.status === "in_progress" || completed;
+  const checkedIn = Boolean(props.checkedInAt) || props.status === "confirmed" || handedOver;
 
   if (completed) return "done";
-  return props.handedOverAt ? "current" : "pending";
+  if (step === "scheduled") return checkedIn ? "done" : "current";
+  if (step === "checked_in") return handedOver ? "done" : checkedIn ? "current" : "pending";
+  if (step === "handover") return handedOver ? "current" : "pending";
+  return "pending";
 };
 
-export function AppointmentProgress(props: AppointmentProgressProps) {
-  const steps = [
-    ["scheduled", "Scheduled"],
-    ["checked_in", "Checked in"],
-    ["handover", "Handed over"],
-    ["complete", "Visit complete"],
-  ] as const;
+const steps = [
+  ["scheduled", "Scheduled"],
+  ["checked_in", "Checked in"],
+  ["handover", "Handed over"],
+  ["complete", "Visit complete"],
+] as const;
 
+export function AppointmentProgress(props: AppointmentProgressProps) {
   return (
-    <div className="appointment-progress" aria-label="Appointment workflow">
-      {steps.map(([step, label], index) => (
-        <div
-          className={`appointment-progress-step ${stepState(step, props)}`}
-          key={step}
-        >
-          <span className="appointment-progress-dot">
-            {stepState(step, props) === "done" ? "✓" : index + 1}
-          </span>
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
+    <ol className="appointment-progress" aria-label="Appointment workflow">
+      {steps.map(([step, label], index) => {
+        const state = stepState(step, props);
+        return (
+          <li
+            className={`appointment-progress-step ${state}`}
+            key={step}
+            aria-current={state === "current" ? "step" : undefined}
+            aria-label={`${label}: ${state === "done" ? "completed" : state === "current" ? "current stage" : "not reached"}`}
+          >
+            <span className="appointment-progress-dot" aria-hidden="true">
+              {state === "done" ? "✓" : index + 1}
+            </span>
+            <span className="appointment-progress-label">{label}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
